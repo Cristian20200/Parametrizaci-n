@@ -9,9 +9,9 @@ paquetes.xlsx: campos=['codigo_paquete', 'descripcion_paquete', 'valor_paquete',
 subcodigos.xlsx: campos=['codigo_base', 'subcodigo', 'descripcion_subcodigo', 'estado'], columnas_codigo_descripcion=[0, 2], registros=19200
 
 ESTADOS:
-COINCIDENCIA PROPUESTA: 659
-REVISIÓN TÉCNICA: 33
-SIN COINCIDENCIA >=80%: 351
+COINCIDENCIA PROPUESTA: 551
+REVISIÓN TÉCNICA: 126
+SIN COINCIDENCIA >=80%: 366
 
 IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.
 Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.
