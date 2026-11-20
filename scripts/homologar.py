@@ -200,12 +200,44 @@ def main():
         rows_out.append([codigo,desc,precio,best['type'] if best else '',best['code'] if best else '',best['description'] if best else '',score if best else '',exp,reg,status,'; '.join(obs),more,best['file'] if best else ''])
         totals[status]+=1
         if n%500==0:print('Procesados',n,flush=True)
+    # La traza es evidencia histórica; no se usa como nomenclador ni para certificar vigencia.
+    traza_file=ROOT/'traza.xlsx'
+    traza_info=['TRAZA: archivo no disponible']
+    traza_lookup=collections.Counter()
+    if traza_file.exists():
+        traza_rows=read_xlsx(traza_file)
+        traza_header=next(traza_rows,[])
+        traza_names=[normalize(h) for h in traza_header]
+        traza_code_cols=[i for i,h in enumerate(traza_names) if any(x in h for x in ('CODIGO','CUPS','SUBCODIGO'))]
+        traza_count=0
+        for tr in traza_rows:
+            traza_count+=1
+            for i in traza_code_cols:
+                code=val(tr,i).upper().replace(' ','')
+                if code and len(code)<=60:
+                    traza_lookup[code]+=1
+        traza_info=[
+            f'TRAZA: filas={traza_count}, encabezados={traza_header[:30]}',
+            f'TRAZA: columnas de códigos detectadas={[(i,traza_header[i]) for i in traza_code_cols]}',
+            'TRAZA: coincidencias de códigos son antecedentes, NO equivalencia clínica ni vigencia oficial'
+        ]
+    traza_original=0
+    traza_candidato=0
+    for record in rows_out:
+        original=record[0].upper().replace(' ','')
+        candidato=record[4].upper().replace(' ','')
+        cnt_o=traza_lookup.get(original,0)
+        cnt_c=traza_lookup.get(candidato,0) if candidato else 0
+        traza_original+=bool(cnt_o)
+        traza_candidato+=bool(cnt_c)
+        record.extend([cnt_o,cnt_c,'ANTECEDENTE / NO VALIDADO' if cnt_o or cnt_c else 'SIN ANTECEDENTE POR CODIGO'])
+    traza_info.extend([f'Filas de prestador con código en traza: {traza_original}',f'Filas de prestador cuyo candidato aparece en traza: {traza_candidato}'])
     output=ROOT/'resultados'/'resultado_homologacion.csv'
-    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen']
+    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen','apariciones_codigo_prestador_traza','apariciones_codigo_homologado_traza','estado_traza']
     with open(output,'w',encoding='utf-8-sig',newline='') as f:
         writer=csv.writer(f,delimiter=';');writer.writerow(columns);writer.writerows(rows_out)
     report=['AUDITORÍA DE HOMOLOGACIÓN DE PRESTADOR',f'Filas procesadas: {len(rows_out)}','',
-            'MAESTROS:',*header_report,'','ESTADOS:',*(f'{k}: {v}' for k,v in sorted(totals.items())),'',
+            'MAESTROS:',*header_report,'','TRAZABILIDAD:',*traza_info,'','ESTADOS:',*(f'{k}: {v}' for k,v in sorted(totals.items())),'',
             'IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.',
             'Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.',
             'Fuente: maestros contenidos en el mismo repositorio y rama utilizada.']
