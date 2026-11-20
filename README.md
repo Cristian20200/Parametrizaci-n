@@ -1,0 +1,1 @@
+# Parametrizaci-n
