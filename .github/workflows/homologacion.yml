@@ -10,6 +10,7 @@ on:
       - "insumos.xlsx"
       - "paquetes.xlsx"
       - "subcodigos.xlsx"
+      - "traza.xlsx"
       - "scripts/homologar.py"
       - ".github/workflows/homologacion.yml"
 permissions:
@@ -25,6 +26,16 @@ jobs:
           python-version: "3.11"
       - name: Dependencias de similitud
         run: python -m pip install rapidfuzz
+      - name: Inspeccionar estructura de traza
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts")
+          from homologar import read_xlsx
+          from itertools import islice
+          for i, row in enumerate(islice(read_xlsx("traza.xlsx"), 4), 1):
+              print(f"TRAZA FILA {i}: {row[:25]}")
+          PY
       - name: Cruce y auditoría
         run: python scripts/homologar.py
       - name: Guardar resultados del prestador en GitHub
