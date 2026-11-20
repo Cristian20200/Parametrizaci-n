@@ -208,7 +208,7 @@ def main():
         # Buscar la tabla principal entre TODAS las hojas: la primera suele ser introductoria.
         from itertools import chain, islice
         with zipfile.ZipFile(traza_file) as z:
-            sheets=[n for n in z.namelist() if re.fullmatch(r'xl/worksheets/sheet\\d+.xml',n)]
+            sheets=[n for n in z.namelist() if re.fullmatch(r'xl/worksheets/sheet\d+.xml',n)]
         best=(-1,0,0,[])
         def score_header(row):
             fields=[normalize(v) for v in row if 0<len(str(v).strip())<=90]
