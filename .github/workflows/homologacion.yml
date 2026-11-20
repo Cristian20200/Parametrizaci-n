@@ -13,6 +13,9 @@ on:
       - "traza.xlsx"
       - "scripts/homologar.py"
       - ".github/workflows/homologacion.yml"
+concurrency:
+  group: homologacion-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -45,5 +48,6 @@ jobs:
           git add resultados/resultado_homologacion.csv resultados/auditoria_homologacion.txt
           if ! git diff --cached --quiet; then
             git commit -m "Actualizar resultados de homologación del prestador"
+            git pull --rebase origin main
             git push
           fi
