@@ -1,0 +1,18 @@
+AUDITORÍA DE HOMOLOGACIÓN DE PRESTADOR
+Filas procesadas: 1043
+
+MAESTROS:
+CUPS.xlsx: campos=['codigo_cups', 'descripcion_cups', '', 'estado'], columnas_codigo_descripcion=[0, 1], registros=10610
+Medicamentos.xlsx: campos=['codigo_medicamento', 'descripcion_medicamento', 'expediente_invima', 'registro_sanitario', 'titular', 'estado'], columnas_codigo_descripcion=[0, 1], registros=83054
+insumos.xlsx: campos=['codigo_insumo', 'descripcion_insumo', 'referencia', 'fabricante', 'estado'], columnas_codigo_descripcion=[0, 1], registros=437778
+paquetes.xlsx: campos=['codigo_paquete', 'descripcion_paquete', 'valor_paquete', 'componentes', 'estado'], columnas_codigo_descripcion=[0, 1], registros=13734
+subcodigos.xlsx: campos=['codigo_base', 'subcodigo', 'descripcion_subcodigo', 'estado'], columnas_codigo_descripcion=[0, 2], registros=19200
+
+ESTADOS:
+COINCIDENCIA PROPUESTA: 659
+REVISIÓN TÉCNICA: 33
+SIN COINCIDENCIA >=80%: 351
+
+IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.
+Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.
+Fuente: maestros contenidos en el mismo repositorio y rama utilizada.
