@@ -206,9 +206,17 @@ def main():
     traza_lookup=collections.Counter()
     if traza_file.exists():
         traza_rows=read_xlsx(traza_file)
-        traza_header=next(traza_rows,[])
+        # El tarifario tiene textos introductorios antes del encabezado real.
+        from itertools import chain, islice
+        preview=list(islice(traza_rows,200))
+        def score_header(row):
+            fields=[normalize(v) for v in row if 0<len(str(v).strip())<=90]
+            return sum(3 for h in fields if 'CODIGO' in h or h in ('CUPS','COD CUPS')) + sum(1 for h in fields if any(s in h for s in ('DESCRIPCION','TARIFA','PROCEDIMIENTO','VALOR','VIGENCIA','ESTADO')))
+        header_pos=max(range(len(preview)),key=lambda i:score_header(preview[i])) if preview else 0
+        traza_header=preview[header_pos] if preview else []
         traza_names=[normalize(h) for h in traza_header]
-        traza_code_cols=[i for i,h in enumerate(traza_names) if any(x in h for x in ('CODIGO','CUPS','SUBCODIGO'))]
+        traza_code_cols=[i for i,h in enumerate(traza_names) if len(h)<=90 and (('CODIGO' in h) or h in ('CUPS','COD CUPS'))]
+        traza_rows=chain(preview[header_pos+1:],traza_rows)
         traza_count=0
         for tr in traza_rows:
             traza_count+=1
@@ -217,7 +225,7 @@ def main():
                 if code and len(code)<=60:
                     traza_lookup[code]+=1
         traza_info=[
-            f'TRAZA: filas={traza_count}, encabezados={traza_header[:30]}',
+            f'TRAZA: filas despues de encabezado={traza_count}, encabezado_fila={header_pos+1}, encabezados={traza_header[:30]}',
             f'TRAZA: columnas de códigos detectadas={[(i,traza_header[i]) for i in traza_code_cols]}',
             'TRAZA: coincidencias de códigos son antecedentes, NO equivalencia clínica ni vigencia oficial'
         ]
