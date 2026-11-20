@@ -42,7 +42,7 @@ def col_idx(ref):
     for c in letters.group():n=n*26+ord(c)-64
     return n-1
 
-def read_xlsx(path):
+def read_xlsx(path, sheet_index=0):
     # Lector de solo lectura usando el formato XML abierto XLSX (sin alterar maestros).
     with zipfile.ZipFile(path) as z:
         names=set(z.namelist())
@@ -55,7 +55,7 @@ def read_xlsx(path):
                         elem.clear()
         sheet_names=sorted([n for n in names if re.fullmatch(r'xl/worksheets/sheet\d+.xml',n)],key=lambda p:int(re.search(r'sheet(\d+)',p).group(1)))
         if not sheet_names:raise ValueError('Sin hojas XML')
-        with z.open(sheet_names[0]) as f:
+        with z.open(sheet_names[sheet_index]) as f:
             for _,elem in ET.iterparse(f,events=('end',)):
                 if elem.tag==NS+'row':
                     cells={}
@@ -205,18 +205,25 @@ def main():
     traza_info=['TRAZA: archivo no disponible']
     traza_lookup=collections.Counter()
     if traza_file.exists():
-        traza_rows=read_xlsx(traza_file)
-        # El tarifario tiene textos introductorios antes del encabezado real.
+        # Buscar la tabla principal entre TODAS las hojas: la primera suele ser introductoria.
         from itertools import chain, islice
-        preview=list(islice(traza_rows,200))
+        with zipfile.ZipFile(traza_file) as z:
+            sheets=[n for n in z.namelist() if re.fullmatch(r'xl/worksheets/sheet\\d+.xml',n)]
+        best=(-1,0,0,[])
         def score_header(row):
             fields=[normalize(v) for v in row if 0<len(str(v).strip())<=90]
+            has_code=any('CODIGO' in h or h in ('CUPS','COD CUPS') for h in fields)
+            if not has_code:return 0
             return sum(3 for h in fields if 'CODIGO' in h or h in ('CUPS','COD CUPS')) + sum(1 for h in fields if any(s in h for s in ('DESCRIPCION','TARIFA','PROCEDIMIENTO','VALOR','VIGENCIA','ESTADO')))
-        header_pos=max(range(len(preview)),key=lambda i:score_header(preview[i])) if preview else 0
-        traza_header=preview[header_pos] if preview else []
+        for sheet_i in range(len(sheets)):
+            preview=list(islice(read_xlsx(traza_file,sheet_i),200))
+            for pos,row in enumerate(preview):
+                score=score_header(row)
+                if score>best[0]:best=(score,sheet_i,pos,row)
+        header_score,sheet_idx,header_pos,traza_header=best
         traza_names=[normalize(h) for h in traza_header]
         traza_code_cols=[i for i,h in enumerate(traza_names) if len(h)<=90 and (('CODIGO' in h) or h in ('CUPS','COD CUPS'))]
-        traza_rows=chain(preview[header_pos+1:],traza_rows)
+        traza_rows=islice(read_xlsx(traza_file,sheet_idx),header_pos+1,None)
         traza_count=0
         for tr in traza_rows:
             traza_count+=1
@@ -225,7 +232,7 @@ def main():
                 if code and len(code)<=60:
                     traza_lookup[code]+=1
         traza_info=[
-            f'TRAZA: filas despues de encabezado={traza_count}, encabezado_fila={header_pos+1}, encabezados={traza_header[:30]}',
+            f'TRAZA: hojas={len(sheets)}, hoja_seleccionada={sheet_idx+1}, puntuacion_encabezado={header_score}, filas_datos={traza_count}, encabezado_fila={header_pos+1}, encabezados={traza_header[:30]}',
             f'TRAZA: columnas de códigos detectadas={[(i,traza_header[i]) for i in traza_code_cols]}',
             'TRAZA: coincidencias de códigos son antecedentes, NO equivalencia clínica ni vigencia oficial'
         ]
