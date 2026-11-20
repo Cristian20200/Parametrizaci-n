@@ -105,8 +105,29 @@ def main():
     for fname in FILES:
         hs,rows,cols=get_table(fname)
         file_counts[fname]=0
+        # Para SUBCODIGO, usar la clave completa y NO codigo_base.
+        sub_idx=base_idx=None
+        if fname=='subcodigos.xlsx':
+            normalized_headers=[normalize(h).replace(' ','_') for h in hs]
+            if 'SUBCODIGO' not in normalized_headers or 'CODIGO_BASE' not in normalized_headers:
+                raise ValueError('subcodigos.xlsx requiere columnas subcodigo y codigo_base')
+            sub_idx=normalized_headers.index('SUBCODIGO')
+            base_idx=normalized_headers.index('CODIGO_BASE')
         for row in rows:
             code=val(row,cols[0]);desc=val(row,cols[1])
+            if fname=='subcodigos.xlsx':
+                base=val(row,base_idx).strip()
+                suffix=val(row,sub_idx).strip()
+                if not suffix:
+                    raise ValueError(f'Subcodigo vacio para codigo_base={base!r}, descripcion={desc!r}')
+                # Algunas fuentes contienen solo el sufijo: reconstruir codigo_base-sufijo.
+                if re.fullmatch(r'\\d+(?:\\.0)?',suffix) and base and suffix!=base:
+                    suffix=suffix.removesuffix('.0')
+                    code=f'{base}-{suffix}'
+                else:
+                    code=suffix
+                if code==base:
+                    raise ValueError(f'Subcodigo indistinguible del codigo_base={base!r}; revisar maestro')
             if not code or not desc:continue
             rec={'type':TYPES[fname],'file':fname,'code':code,'description':desc,'norm':normalize(desc),'tokens':tokenize(desc),'extra':{}}
             for i,h in enumerate(hs):
