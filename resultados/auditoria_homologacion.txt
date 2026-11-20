@@ -14,7 +14,7 @@ TRAZA: hojas=4, hoja_seleccionada=2, puntuacion_encabezado=39, filas_datos=10189
 TRAZA: columnas de códigos detectadas=[(0, 'Código con puntos_1'), (1, 'CÓDIGO_0'), (5, 'Código con puntos_2'), (6, 'CÓDIGO 1'), (7, 'CÓDIGO 2'), (13, 'CÓDIGO 1'), (19, 'CÓDIGO_1_2024'), (29, 'CODIGO SOAT'), (32, 'CODIGO_ISS_2000')]
 TRAZA: coincidencias de códigos son antecedentes, NO equivalencia clínica ni vigencia oficial
 Filas de prestador con código en traza: 165
-Filas de prestador cuyo candidato aparece en traza: 122
+Filas de prestador cuyo candidato aparece en traza: 120
 
 ESTADOS:
 COINCIDENCIA PROPUESTA: 253
