@@ -22,7 +22,7 @@ HEADERS={
 'paquetes.xlsx':[['codigo_paquete','codigo'],['descripcion_paquete','descripcion','nombre']],
 'subcodigos.xlsx':[['subcodigo','codigo_base','codigo'],['descripcion_subcodigo','descripcion','nombre']],
 }
-FILES=['CUPS.xlsx','Medicamentos.xlsx','insumos.xlsx','paquetes.xlsx','subcodigos.xlsx']
+FILES=['CUPS.xlsx','subcodigos.xlsx','paquetes.xlsx','Medicamentos.xlsx','insumos.xlsx']
 TYPES={'CUPS.xlsx':'CUPS','Medicamentos.xlsx':'MEDICAMENTO','insumos.xlsx':'INSUMO','paquetes.xlsx':'PAQUETE','subcodigos.xlsx':'SUBCODIGO'}
 
 def plain(s):
@@ -101,7 +101,7 @@ def val(row,i):
 def main():
     os.makedirs(ROOT/'resultados',exist_ok=True)
     records=[]; index=collections.defaultdict(set); file_counts={}
-    header_report=[]
+    header_report=['ORDEN DE BUSQUEDA: CUPS > SUBCODIGO > PAQUETE > MEDICAMENTO > INSUMO']
     for fname in FILES:
         hs,rows,cols=get_table(fname)
         file_counts[fname]=0
@@ -139,34 +139,49 @@ def main():
             score=similarity(norm,m['norm'])
             # Evita emparejamientos débiles por listas comunes; asignación siempre supervisada.
             if score>=70:ranked.append((score,j))
+        # Orden estricto de los maestros definido por el usuario.
+        # Un maestro se considera válido SOLO si existe coincidencia >=80%
+        # Y no hay incompatibilidad detectada de concentración, vía o ingrediente.
+        # Coincidencias dudosas no bloquean los maestros posteriores.
+        order=['CUPS','SUBCODIGO','PAQUETE','MEDICAMENTO','INSUMO']
         ranked.sort(key=lambda pair:-pair[0])
-        # Evitar falsos insumos: la tabla de insumos también contiene nombres de fármacos.
-        # Si el registro es una sustancia farmacológica, priorizar la lista de medicamentos
-        # y NO forzar equivalencia por una coincidencia léxica con un insumo.
-        med_candidates=[(v,j) for v,j in ranked if records[j]['type']=='MEDICAMENTO']
-        if ranked and med_candidates and records[ranked[0][1]]['type']!='MEDICAMENTO':
-            med_score,med_index=max(med_candidates)
-            prefix=set(tokens[:3]) - {'ACIDO','SULFATO','CLORHIDRATO','SODICO','SOLUCION'}
-            med_tokens=set(records[med_index]['tokens'])
-            if med_score>=70 and prefix.intersection(med_tokens):
-                ranked=[(med_score,med_index)]+[(v,j) for v,j in ranked if j!=med_index]
-        top=ranked[:5]
-        best=records[top[0][1]] if top else None
-        score=round(top[0][0],1) if top else 0
-        # Número/concentración y forma NO deben confundirse por similitud textual.
-        digits1=set(re.findall(r'(?<!\d)\d+(?:\.\d+)?',norm))
-        digits2=set(re.findall(r'(?<!\d)\d+(?:\.\d+)?',best['norm'])) if best else set()
-        numeric_difference=bool(digits1 and digits2 and digits1!=digits2)
         route_terms=['INYECTABLE','AMPOLLA','TABLETA','JARABE','SUSPENSION','CREMA','GOTAS','CAPSULA','INHALADOR','OVULO']
-        a={t for t in route_terms if t in norm};b={t for t in route_terms if best and t in best['norm']}
-        route_difference=bool(a and b and not a.intersection(b))
-        # Compatibilidad de principios activos: comparación anclada en los términos iniciales.
-        important=[t for t in tokens[:3] if t not in {'ACIDO','SULFATO','CLORHIDRATO','SODICO'}]
-        invalid_ingredient=bool(best and important and not set(important).intersection(best['tokens']))
-        ambiguous_form=bool(best and best['type']=='MEDICAMENTO' and
-                            ('TAB CAP' in best['norm'] or 'CAP TAB' in best['norm']))
-        if score<80:status='SIN COINCIDENCIA >=80%'
-        elif numeric_difference or route_difference or invalid_ingredient or ambiguous_form:
+        def evaluate(pair):
+            v,j=pair
+            m=records[j]
+            md=m['norm']
+            digits1=set(re.findall(r'(?<!\\d)\\d+(?:\\.\\d+)?',norm))
+            digits2=set(re.findall(r'(?<!\\d)\\d+(?:\\.\\d+)?',md))
+            numeric=bool(digits1 and digits2 and digits1!=digits2)
+            a={t for t in route_terms if t in norm}
+            b={t for t in route_terms if t in md}
+            route=bool(a and b and not a.intersection(b))
+            important=[t for t in tokens[:3] if t not in {'ACIDO','SULFATO','CLORHIDRATO','SODICO'}]
+            ingredient=bool(important and not set(important).intersection(m['tokens']))
+            ambiguous=bool(m['type']=='MEDICAMENTO' and ('TAB CAP' in md or 'CAP TAB' in md))
+            return numeric,route,ingredient,ambiguous
+        eligible=[pair for pair in ranked if pair[0]>=80 and not any(evaluate(pair))]
+        selected=None
+        for category in order:
+            choices=[pair for pair in eligible if records[pair[1]]['type']==category]
+            if choices:
+                selected=max(choices,key=lambda pair:pair[0])
+                break
+        # Si no hay coincidencia clínicamente aceptable, dar el mejor candidato
+        # para revisión, sin declararlo homologado.
+        if selected is None:
+            for category in order:
+                choices=[pair for pair in ranked if pair[0]>=80 and records[pair[1]]['type']==category]
+                if choices:
+                    selected=max(choices,key=lambda pair:pair[0])
+                    break
+        best=records[selected[1]] if selected else None
+        score=round(selected[0],1) if selected else 0
+        numeric_difference,route_difference,invalid_ingredient,ambiguous_form=(
+            evaluate(selected) if selected else (False,False,False,False))
+        top=[selected]+[pair for pair in ranked if pair!=selected][:4] if selected else ranked[:5]
+        if not selected:status='SIN COINCIDENCIA >=80%'
+        elif any((numeric_difference,route_difference,invalid_ingredient,ambiguous_form)):
             status='REVISIÓN TÉCNICA'
         else:status='COINCIDENCIA PROPUESTA'
         if not best or score<80:best=None
