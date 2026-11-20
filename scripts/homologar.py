@@ -91,8 +91,8 @@ def get_table(filename):
     score,header_i,matches=max(candidates,key=lambda x:x[0])
     if score<2:raise ValueError(f'{filename}: Encabezados desconocidos. Primeras filas: {first[:3]}')
     headers=first[header_i]
-    allrows=first[header_i+1:]
-    allrows.extend(rows)
+    from itertools import chain
+    allrows=chain(first[header_i+1:],rows)
     return headers, (row for row in allrows if any(str(v).strip() for v in row)),matches
 
 def val(row,i):
@@ -140,24 +140,42 @@ def main():
             # Evita emparejamientos débiles por listas comunes; asignación siempre supervisada.
             if score>=70:ranked.append((score,j))
         ranked.sort(key=lambda pair:-pair[0])
+        # Evitar falsos insumos: la tabla de insumos también contiene nombres de fármacos.
+        # Si el registro es una sustancia farmacológica, priorizar la lista de medicamentos
+        # y NO forzar equivalencia por una coincidencia léxica con un insumo.
+        med_candidates=[(v,j) for v,j in ranked if records[j]['type']=='MEDICAMENTO']
+        if ranked and med_candidates and records[ranked[0][1]]['type']!='MEDICAMENTO':
+            med_score,med_index=max(med_candidates)
+            prefix=set(tokens[:3]) - {'ACIDO','SULFATO','CLORHIDRATO','SODICO','SOLUCION'}
+            med_tokens=set(records[med_index]['tokens'])
+            if med_score>=70 and prefix.intersection(med_tokens):
+                ranked=[(med_score,med_index)]+[(v,j) for v,j in ranked if j!=med_index]
         top=ranked[:5]
         best=records[top[0][1]] if top else None
         score=round(top[0][0],1) if top else 0
         # Número/concentración y forma NO deben confundirse por similitud textual.
-        digits1=set(re.findall(r'\b\d+(?:\.\d+)?\b',norm))
-        digits2=set(re.findall(r'\b\d+(?:\.\d+)?\b',best['norm'])) if best else set()
+        digits1=set(re.findall(r'(?<!\d)\d+(?:\.\d+)?',norm))
+        digits2=set(re.findall(r'(?<!\d)\d+(?:\.\d+)?',best['norm'])) if best else set()
         numeric_difference=bool(digits1 and digits2 and digits1!=digits2)
         route_terms=['INYECTABLE','AMPOLLA','TABLETA','JARABE','SUSPENSION','CREMA','GOTAS','CAPSULA','INHALADOR','OVULO']
         a={t for t in route_terms if t in norm};b={t for t in route_terms if best and t in best['norm']}
         route_difference=bool(a and b and not a.intersection(b))
+        # Compatibilidad de principios activos: comparación anclada en los términos iniciales.
+        important=[t for t in tokens[:3] if t not in {'ACIDO','SULFATO','CLORHIDRATO','SODICO'}]
+        invalid_ingredient=bool(best and important and not set(important).intersection(best['tokens']))
+        ambiguous_form=bool(best and best['type']=='MEDICAMENTO' and
+                            ('TAB CAP' in best['norm'] or 'CAP TAB' in best['norm']))
         if score<80:status='SIN COINCIDENCIA >=80%'
-        elif numeric_difference or route_difference:status='REVISIÓN TÉCNICA'
+        elif numeric_difference or route_difference or invalid_ingredient or ambiguous_form:
+            status='REVISIÓN TÉCNICA'
         else:status='COINCIDENCIA PROPUESTA'
         if not best or score<80:best=None
         obs=[]
         if numeric_difference:obs.append('Revisar concentración, medidas y presentación')
         if route_difference:obs.append('Revisar forma farmacéutica/vía')
-        if best and best['type']=='MEDICAMENTO':obs.append('Expediente por verificar con producto y fabricante')
+        if invalid_ingredient:obs.append('Principio activo o sustancia por verificar')
+        if ambiguous_form:obs.append('El maestro indica TAB/CAP: verificar forma farmacéutica exacta')
+        if best and best['type']=='MEDICAMENTO':obs.append('Verificar expediente/registro según titular y producto')
         if best and best['type']=='SUBCODIGO':obs.append('Confirmar código base y metodología')
         if not best:obs.append('Sin maestro con similitud suficiente; revisar manualmente')
         more=' | '.join(f"{records[j]['type']}:{records[j]['code']} ({round(s,1)}%)" for s,j in top[1:3])
