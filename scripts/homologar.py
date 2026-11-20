@@ -121,7 +121,7 @@ def main():
                 if not suffix:
                     raise ValueError(f'Subcodigo vacio para codigo_base={base!r}, descripcion={desc!r}')
                 # Algunas fuentes contienen solo el sufijo: reconstruir codigo_base-sufijo.
-                if re.fullmatch(r'\\d+(?:\\.0)?',suffix) and base and suffix!=base:
+                if re.fullmatch(r'\d+(?:\.0)?',suffix) and base and suffix!=base:
                     suffix=suffix.removesuffix('.0')
                     code=f'{base}-{suffix}'
                 else:
