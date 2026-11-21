@@ -4,7 +4,7 @@ Filas procesadas: 427
 MAESTROS:
 ORDEN DE BUSQUEDA: CUPS > SUBCODIGO > PAQUETE > MEDICAMENTO > INSUMO
 CUPS.xlsx: campos=['codigo_cups', 'descripcion_cups', '', 'estado'], columnas_codigo_descripcion=[0, 1], registros=10610
-subcodigos.xlsx: campos=['codigo_base', 'subcodigo', 'descripcion_subcodigo', 'estado'], columnas_codigo_descripcion=[0, 2], registros=19200
+subcodigos.xlsx: campos=['Código Base', 'Código relacionado al subcodigo', 'Descripción', 'Estado'], columnas_codigo_descripcion=[0, 2], registros=19213
 paquetes.xlsx: campos=['codigo_paquete', 'descripcion_paquete', 'valor_paquete', 'componentes', 'estado'], columnas_codigo_descripcion=[0, 1], registros=13734
 Medicamentos.xlsx: campos=['codigo_medicamento', 'descripcion_medicamento', 'expediente_invima', 'registro_sanitario', 'titular', 'estado'], columnas_codigo_descripcion=[0, 1], registros=83054
 insumos.xlsx: campos=['codigo_insumo', 'descripcion_insumo', 'referencia', 'fabricante', 'estado'], columnas_codigo_descripcion=[0, 1], registros=437778
