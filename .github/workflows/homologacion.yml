@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "Prestador.xlsx"
+      - "HAM.xlsx"
       - "CUPS.xlsx"
       - "Medicamentos.xlsx"
       - "insumos.xlsx"
@@ -12,6 +13,7 @@ on:
       - "subcodigos.xlsx"
       - "traza.xlsx"
       - "scripts/homologar.py"
+      - "scripts/comparar_ham.py"
       - ".github/workflows/homologacion.yml"
 concurrency:
   group: homologacion-${{ github.ref }}
@@ -41,11 +43,13 @@ jobs:
           PY
       - name: Cruce y auditoría
         run: python scripts/homologar.py
+      - name: Auditoría contractual entre anexo y HAM
+        run: python scripts/comparar_ham.py
       - name: Guardar resultados del prestador en GitHub
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add resultados/resultado_homologacion.csv resultados/auditoria_homologacion.txt
+          git add resultados/resultado_homologacion.csv resultados/auditoria_homologacion.txt resultados/cruce_anexo_ham.csv resultados/auditoria_anexo_ham.txt
           if ! git diff --cached --quiet; then
             git commit -m "Actualizar resultados de homologación del prestador"
             git pull --rebase origin main
