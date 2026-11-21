@@ -32,6 +32,16 @@ jobs:
           python-version: "3.11"
       - name: Dependencias de similitud
         run: python -m pip install rapidfuzz
+      - name: Diagnosticar estructura de subcodigos
+        run: |
+          python - <<'PY'
+          import sys
+          from itertools import islice
+          sys.path.insert(0, "scripts")
+          from homologar import read_xlsx
+          for n, row in enumerate(islice(read_xlsx("subcodigos.xlsx"), 4), 1):
+              print(f"SUBCODIGOS FILA {n}: {row[:12]}")
+          PY
       - name: Pruebas de regresión contractual
         run: python scripts/test_comparar_ham.py
       - name: Inspeccionar estructura de traza
