@@ -116,7 +116,7 @@ def record(a=None,b=None,decision="",motivo="",action="",proposed=None,score_val
        "codigo_maestro_propuesto":old.get("codigo_homologado",""),
        "estado_homologacion_maestro":old.get("estado_homologacion",""),
        "decision":decision,"motivo":motivo,"accion_ham":action,
-       "requiere_validacion":"NO" if decision=="COINCIDENCIA EXACTA" else "SI",
+       "requiere_validacion":"SI - VIGENCIA Y ATRIBUTOS TECNICOS" if decision=="COINCIDENCIA EXACTA" else "SI",
     }
 
 def classify(a,b,proposed):
@@ -150,7 +150,13 @@ def compare(annex,ham,legacy):
     result=[]
     duplicates=Counter((key(a["code"]),a["norm"]) for a in annex)
     price_variants=defaultdict(set)
-    for a in annex:price_variants[(key(a["code"]),a["norm"])].add(a["tariff"])
+    code_descriptions=defaultdict(set)
+    code_tariffs=defaultdict(set)
+    for a in annex:
+        price_variants[(key(a["code"]),a["norm"])].add(a["tariff"])
+        if a["code"]:
+            code_descriptions[key(a["code"])].add(a["norm"])
+            code_tariffs[key(a["code"])].add(a["tariff"])
     for a in annex:
         old_candidates=legacy.get(a["code"],[])
         proposal=next((x for x in old_candidates if x.get("descripcion_prestador","")==a["desc"]),old_candidates[0] if old_candidates else {})
@@ -174,10 +180,20 @@ def compare(annex,ham,legacy):
             continue
         assigned.add(j)
         decision,motive,action,s=classify(a,b,proposal)
+        if len(code_descriptions[key(a["code"])])>1:
+            decision="MISMO CODIGO / DESCRIPCIONES DIFERENTES"
+            action="REVISAR CODIGO BASE O SUBCODIGO"
+            motive+="; comparar procedimientos, tarifas y subcodigos completos; no seleccionar automaticamente"
+            if len(code_tariffs[key(a["code"])])>1:
+                motive+="; existen tarifas diferentes bajo el mismo codigo"
         if duplicates[(key(a["code"]),a["norm"])]>1 or len(price_variants[(key(a["code"]),a["norm"])])>1:
             decision="DUPLICIDAD CONTRACTUAL"
             action="REVISION MANUAL"
             motive+="; mismo código y descripción repetidos o con varias tarifas en anexo"
+        if re.search(r"\b(PAQUETE|INCLUYE)\b",normalize(a["desc"])):
+            motive+="; posible paquete: revisar componentes, cobertura y catalogo de paquetes"
+        if proposal.get("tipo_servicio") in {"MEDICAMENTO","INSUMO"}:
+            motive+="; validacion tecnica obligatoria: registro, concentracion/presentacion o referencia segun corresponda"
         result.append(record(a,b,decision=decision,motivo=motive,action=action,proposed=proposal,score_val=s))
     for j,b in enumerate(ham):
         if j not in assigned:
