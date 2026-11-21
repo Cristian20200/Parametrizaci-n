@@ -109,10 +109,12 @@ def main():
         sub_idx=base_idx=None
         if fname=='subcodigos.xlsx':
             normalized_headers=[normalize(h).replace(' ','_') for h in hs]
-            if 'SUBCODIGO' not in normalized_headers or 'CODIGO_BASE' not in normalized_headers:
-                raise ValueError('subcodigos.xlsx requiere columnas subcodigo y codigo_base')
-            sub_idx=normalized_headers.index('SUBCODIGO')
-            base_idx=normalized_headers.index('CODIGO_BASE')
+            base_aliases=('CODIGO_BASE','CODIGO_BASE_CUPS')
+            sub_aliases=('SUBCODIGO','CODIGO_RELACIONADO_AL_SUBCODIGO','CODIGO_RELACIONADO_AL_SUB_CODIGO')
+            base_idx=next((i for i,h in enumerate(normalized_headers) if h in base_aliases),None)
+            sub_idx=next((i for i,h in enumerate(normalized_headers) if h in sub_aliases),None)
+            if base_idx is None or sub_idx is None or base_idx==sub_idx:
+                raise ValueError(f'subcodigos.xlsx: no se localizaron ambas columnas codigo_base y subcodigo: {hs!r}')
         for row in rows:
             code=val(row,cols[0]);desc=val(row,cols[1])
             if fname=='subcodigos.xlsx':
