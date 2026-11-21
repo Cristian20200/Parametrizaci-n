@@ -14,6 +14,7 @@ on:
       - "traza.xlsx"
       - "scripts/homologar.py"
       - "scripts/comparar_ham.py"
+      - "scripts/test_comparar_ham.py"
       - ".github/workflows/homologacion.yml"
 concurrency:
   group: homologacion-${{ github.ref }}
@@ -31,6 +32,8 @@ jobs:
           python-version: "3.11"
       - name: Dependencias de similitud
         run: python -m pip install rapidfuzz
+      - name: Pruebas de regresión contractual
+        run: python scripts/test_comparar_ham.py
       - name: Inspeccionar estructura de traza
         run: |
           python - <<'PY'
