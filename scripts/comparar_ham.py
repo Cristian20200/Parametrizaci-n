@@ -51,6 +51,12 @@ ALIASES = [
     (r"\bTAB(?:LETA)?S?\b", " TABLETA "),
     (r"\bCAP(?:SULA)?S?\b", " CAPSULA "),
     (r"\bINY(?:ECTABLE|ECCION|ECCION(?:ES)?)?\.?\b", " INYECTABLE "),
+    (r"\bSLN\b|\bSOL\b|\bSOLUCION\b", " SOLUCION "),
+    (r"\bAMP\b|\bAMPOLLA\b", " AMPOLLA "),
+    (r"\bFCO\b|\bFRASCO\b", " FRASCO "),
+    (r"\bTUB\b|\bTUBO\b", " TUBO "),
+    (r"\bRX\b|\bRADIOGRAFIA\b", " RADIOGRAFIA "),
+    (r"\bTRANSFUSION\b|\bTRANSFUSIONES\b", " TRANSFUSION "),
     (r"\bINYECCIONES?\b", " INYECTABLE "),
     (r"\bMG\b", " MG "),
     (r"\bML\b", " ML "),
@@ -72,18 +78,30 @@ def clinical_tokens(s):
     # Evitar que una abreviatura comun penalice el emparejamiento.
     return set(re.findall(r"[A-Z]+|\d+(?:[.,]\d+)?(?:MG|MCG|ML|UI|G|L)?", clinical_text(s)))
 def concentration(s):
-    s=clinical_text(s)
-    return set(re.findall(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|UI)/\d+(?:[.,]\d+)?(?:ML|L)\b",s))
+    """Concentraciones normalizadas a mg/ml (o UI/ml), sin inferir equivalencia por marca."""
+    text=clinical_text(s)
+    matches=re.findall(r"\b(\d+(?:[.,]\d+)?)\s*(MCG|MG|G|UI)\s*/\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",text)
+    values=set()
+    for mass,unit,volume,vunit in matches:
+        m=Decimal(mass.replace(",","."));v=Decimal(volume.replace(",","."))
+        if not v:continue
+        if unit=="MCG":m=m/Decimal(1000);unit="MG"
+        if unit=="G":m=m*Decimal(1000);unit="MG"
+        if vunit=="L":v=v*Decimal(1000)
+        values.add((unit,m/v))
+    return values
 def numeric_specs(s):
     s=clinical_text(s)
     # Toda cifra con unidad se mantiene como atributo técnico.
     return set(re.findall(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|ML|L|UI)\b",s))
 def clinical_conflict(a,b):
     ca,cb=concentration(a["desc"]),concentration(b["desc"])
-    if ca and cb and ca!=cb:
-        return "CONCENTRACION DIFERENTE"
+    if ca and cb:
+        if ca!=cb:return "CONCENTRACION DIFERENTE"
+        # Una misma concentración no garantiza la misma presentación, pero
+        # evita interpretar 8mg/4ml y 2mg/ml como sustancias distintas.
+        return ""
     na,nb=numeric_specs(a["desc"]),numeric_specs(b["desc"])
-    # Evitar equivalencia automatica de dosis o dimensiones distintas.
     if na and nb and na!=nb:
         return "CANTIDAD O UNIDAD DIFERENTE"
     return ""
@@ -92,7 +110,12 @@ def clinical_score(a,b):
     if not atext or not btext:return 0.
     ta,tb=clinical_tokens(a["desc"]),clinical_tokens(b["desc"])
     overlap=100*len(ta&tb)/len(ta|tb) if ta and tb else 0
-    return round(.60*similarity(atext,btext)+.40*overlap,1)
+    # El nombre corto sigue siendo informativo aunque el otro incluya presentación.
+    coverage=100*len(ta&tb)/min(len(ta),len(tb)) if ta and tb else 0
+    result=.50*similarity(atext,btext)+.30*overlap+.20*coverage
+    ca,cb=concentration(a["desc"]),concentration(b["desc"])
+    if ca and cb and ca==cb:result=max(result,75)
+    return round(result,1)
 
 def load_book(name):
     filename=ROOT/name
