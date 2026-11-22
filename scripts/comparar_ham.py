@@ -69,6 +69,7 @@ def clinical_text(s):
     for pattern,replacement in ALIASES:
         s=re.sub(pattern,replacement,s)
     # Mantener juntos números, unidades y símbolos: 10MG/1ML es una concentración.
+    s=re.sub(r"(\d+(?:[.,]\d+)?\s*(?:MG|MCG|G|UI))\s*/\s*(ML|L)\b",r"\1/1\2",s)
     s=re.sub(r"(?<=\d)\s+(?=MG\b|ML\b|G\b|MCG\b|UI\b)", "", s)
     s=re.sub(r"(?<=MG|ML)\s*/\s*(?=\d)", "/",s) if False else s
     s=re.sub(r"(\d+(?:[.,]\d+)?)\s*(MG|MCG|G|UI)\s*/\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",r"\1\2/\3\4",s)
