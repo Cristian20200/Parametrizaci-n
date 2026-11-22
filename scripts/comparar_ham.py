@@ -17,7 +17,7 @@ OUT = ROOT / "resultados"
 FIELDS = ["origen","fila_anexo","codigo_anexo","descripcion_anexo","tarifa_anexo",
           "fila_ham","codigo_ham","descripcion_ham","tarifa_ham",
           "similitud_descripcion","diferencia_tarifa","categoria_propuesta",
-          "codigo_maestro_propuesto","estado_homologacion_maestro",
+          "codigo_maestro_propuesto","descripcion_maestro_propuesto","similitud_anexo_maestro","estado_homologacion_maestro",
           "decision","motivo","accion_ham","requiere_validacion"]
 
 def key(s):
@@ -43,6 +43,56 @@ def amount(v):
         return Decimal(v)
     except InvalidOperation:
         return None
+
+
+# Equivalencias de redacción (no equivalencias clínicas automáticas).
+ALIASES = [
+    (r"\bTAB\s*/\s*CAP\b", " TABLETA CAPSULA "),
+    (r"\bTAB(?:LETA)?S?\b", " TABLETA "),
+    (r"\bCAP(?:SULA)?S?\b", " CAPSULA "),
+    (r"\bINY(?:ECTABLE|ECCION|ECCION(?:ES)?)?\.?\b", " INYECTABLE "),
+    (r"\bINYECCIONES?\b", " INYECTABLE "),
+    (r"\bMG\b", " MG "),
+    (r"\bML\b", " ML "),
+    (r"\bPROFILAXIS\b", " PROFILAXIS "),
+]
+def clinical_text(s):
+    s=unicodedata.normalize("NFKD",str(s or "").upper())
+    s="".join(ch for ch in s if not unicodedata.combining(ch))
+    s=s.replace("µG","MCG").replace("μG","MCG")
+    for pattern,replacement in ALIASES:
+        s=re.sub(pattern,replacement,s)
+    # Mantener juntos números, unidades y símbolos: 10MG/1ML es una concentración.
+    s=re.sub(r"(?<=\d)\s+(?=MG\b|ML\b|G\b|MCG\b|UI\b)", "", s)
+    s=re.sub(r"(?<=MG|ML)\s*/\s*(?=\d)", "/",s) if False else s
+    s=re.sub(r"(\d+(?:[.,]\d+)?)\s*(MG|MCG|G|UI)\s*/\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",r"\1\2/\3\4",s)
+    s=re.sub(r"[^A-Z0-9/.,]+"," ",s)
+    return " ".join(s.split())
+def clinical_tokens(s):
+    # Evitar que una abreviatura comun penalice el emparejamiento.
+    return set(re.findall(r"[A-Z]+|\d+(?:[.,]\d+)?(?:MG|MCG|ML|UI|G|L)?", clinical_text(s)))
+def concentration(s):
+    s=clinical_text(s)
+    return set(re.findall(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|UI)/\d+(?:[.,]\d+)?(?:ML|L)\b",s))
+def numeric_specs(s):
+    s=clinical_text(s)
+    # Toda cifra con unidad se mantiene como atributo técnico.
+    return set(re.findall(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|ML|L|UI)\b",s))
+def clinical_conflict(a,b):
+    ca,cb=concentration(a["desc"]),concentration(b["desc"])
+    if ca and cb and ca!=cb:
+        return "CONCENTRACION DIFERENTE"
+    na,nb=numeric_specs(a["desc"]),numeric_specs(b["desc"])
+    # Evitar equivalencia automatica de dosis o dimensiones distintas.
+    if na and nb and na!=nb:
+        return "CANTIDAD O UNIDAD DIFERENTE"
+    return ""
+def clinical_score(a,b):
+    atext,btext=clinical_text(a["desc"]),clinical_text(b["desc"])
+    if not atext or not btext:return 0.
+    ta,tb=clinical_tokens(a["desc"]),clinical_tokens(b["desc"])
+    overlap=100*len(ta&tb)/len(ta|tb) if ta and tb else 0
+    return round(.60*similarity(atext,btext)+.40*overlap,1)
 
 def load_book(name):
     filename=ROOT/name
@@ -114,6 +164,8 @@ def record(a=None,b=None,decision="",motivo="",action="",proposed=None,score_val
        "diferencia_tarifa":money_diff,
        "categoria_propuesta":old.get("tipo_servicio",""),
        "codigo_maestro_propuesto":old.get("codigo_homologado",""),
+       "descripcion_maestro_propuesto":old.get("descripcion_homologada",""),
+       "similitud_anexo_maestro":round(similarity(clinical_text(a["desc"]),clinical_text(old.get("descripcion_homologada",""))),1) if a and old.get("descripcion_homologada") else "",
        "estado_homologacion_maestro":old.get("estado_homologacion",""),
        "decision":decision,"motivo":motivo,"accion_ham":action,
        "requiere_validacion":"SI - VIGENCIA Y ATRIBUTOS TECNICOS" if decision=="COINCIDENCIA EXACTA" else "SI",
@@ -143,62 +195,137 @@ def classify(a,b,proposed):
     return decision,"; ".join(reason),action,s
 
 def compare(annex,ham,legacy):
-    by_ham_code=defaultdict(list)
+    """Cruce bidireccional uno a uno; sin deducir bajas definitivas."""
+    by_code=defaultdict(list)
+    by_tariff=defaultdict(list)
     for j,b in enumerate(ham):
-        if b["code"]:by_ham_code[key(b["code"])].append(j)
+        by_code[key(b["code"])].append(j)
+        if b["money"] is not None:by_tariff[b["money"]].append(j)
+
+    # Priorizar acuerdos claros globalmente, no procesar filas en orden arbitrario.
+    proposals=[]
+    ambiguity=defaultdict(list)
+    duplicates=Counter((key(a["code"]),clinical_text(a["desc"]),a["money"]) for a in annex)
+    code_desc=defaultdict(set)
+    code_prices=defaultdict(set)
+    for a in annex:
+        code_desc[key(a["code"])].add(clinical_text(a["desc"]))
+        code_prices[key(a["code"])].add(a["money"])
+    for i,a in enumerate(annex):
+        old=legacy.get(a["code"],[])
+        master=next((x for x in old if x.get("descripcion_prestador","")==a["desc"]),old[0] if old else {})
+        candidate_ids=set(by_code.get(key(a["code"]),[]))
+        if a["money"] is not None:
+            candidate_ids.update(by_tariff[a["money"]])
+        # Reintentar con el codigo del maestro propuesto, sin perder el sufijo.
+        mk=key(master.get("codigo_homologado",""))
+        if mk:
+            candidate_ids.update(by_code.get(mk,[]))
+        for j in candidate_ids:
+            b=ham[j]
+            exact_code=bool(a["code"]) and key(a["code"])==key(b["code"])
+            master_code=bool(mk) and mk==key(b["code"])
+            tariff_ok=same_tariff(a,b)
+            s=clinical_score(a,b)
+            same_desc=clinical_text(a["desc"])==clinical_text(b["desc"])
+            if not exact_code and not master_code and not tariff_ok:
+                continue
+            if not exact_code and not master_code and s<65:
+                continue
+            conflict=clinical_conflict(a,b)
+            # Las diferencias de concentración no desaparecen por tarifa/código iguales.
+            if exact_code and same_desc and tariff_ok and not conflict:
+                tier=7
+            elif exact_code and tariff_ok and s>=70 and not conflict:
+                tier=6
+            elif master_code and tariff_ok and s>=72 and not conflict:
+                tier=5
+            elif tariff_ok and s>=88 and not conflict:
+                tier=4
+            elif tariff_ok and s>=70 and not conflict:
+                tier=3
+            elif exact_code and s>=60:
+                tier=2
+            elif master_code and s>=60:
+                tier=1
+            else:
+                continue
+            proposals.append((tier,s,i,j,conflict,master))
+            ambiguity[i].append((tier,s,j))
+    proposals.sort(key=lambda x:(x[0],x[1]),reverse=True)
+    # No asignar automaticamente un par si hay empate de calidad contra varios HAM.
+    uncertain=set()
+    for i,options in ambiguity.items():
+        options.sort(reverse=True)
+        if len(options)>=2 and options[0][0]==options[1][0] and options[0][1]-options[1][1]<2:
+            uncertain.add(i)
+    chosen={}
     assigned=set()
-    result=[]
-    duplicates=Counter((key(a["code"]),a["norm"]) for a in annex)
-    price_variants=defaultdict(set)
-    code_descriptions=defaultdict(set)
-    code_tariffs=defaultdict(set)
-    for a in annex:
-        price_variants[(key(a["code"]),a["norm"])].add(a["tariff"])
-        if a["code"]:
-            code_descriptions[key(a["code"])].add(a["norm"])
-            code_tariffs[key(a["code"])].add(a["tariff"])
-    for a in annex:
-        old_candidates=legacy.get(a["code"],[])
-        proposal=next((x for x in old_candidates if x.get("descripcion_prestador","")==a["desc"]),old_candidates[0] if old_candidates else {})
-        matching=[j for j in by_ham_code.get(key(a["code"]),[]) if j not in assigned]
-        # Solo comparar por descripción+tarifa si el código no encuentra candidato único.
-        match_type="codigo"
-        if not matching:
-            matching=[j for j,b in enumerate(ham) if j not in assigned and same_tariff(a,b) and score(a,b)>=80]
-            match_type="descripcion_tarifa"
-        # No escoger arbitrariamente entre dos filas válidas.
-        scored=sorted(((score(a,ham[j]),j) for j in matching),reverse=True)
-        if not scored:
-            result.append(record(a,decision="EN ANEXO NO IDENTIFICADO EN HAM",motivo="Requiere cruce adicional por maestros; no se certifica ausencia contractual",action="EVALUAR CREACION",proposed=proposal))
-            continue
-        if len(scored)>1 and (scored[0][0]-scored[1][0]<5 or match_type=="codigo"):
-            result.append(record(a,decision="MULTIPLES CANDIDATOS HAM",motivo=f"{len(scored)} registros posibles; evitar emparejamiento arbitrario",action="REVISION MANUAL",proposed=proposal))
-            continue
-        s,j=scored[0];b=ham[j]
-        if match_type=="descripcion_tarifa" and (s<95 or len(scored)>1):
-            result.append(record(a,b,decision="CODIGO PROPIO / EQUIVALENCIA POR VALIDAR",motivo="Código distinto y descripción aproximada: confirmar atributos clínicos",action="REVISION MANUAL",proposed=proposal,score_val=s))
-            continue
+    for tier,s,i,j,conflict,master in proposals:
+        if i in chosen or j in assigned or i in uncertain:continue
+        chosen[i]=(j,tier,s,conflict,master)
         assigned.add(j)
-        decision,motive,action,s=classify(a,b,proposal)
-        if len(code_descriptions[key(a["code"])])>1:
-            decision="MISMO CODIGO / DESCRIPCIONES DIFERENTES"
-            action="REVISAR CODIGO BASE O SUBCODIGO"
-            motive+="; comparar procedimientos, tarifas y subcodigos completos; no seleccionar automaticamente"
-            if len(code_tariffs[key(a["code"])])>1:
-                motive+="; existen tarifas diferentes bajo el mismo codigo"
-        if duplicates[(key(a["code"]),a["norm"])]>1 or len(price_variants[(key(a["code"]),a["norm"])])>1:
-            decision="DUPLICIDAD CONTRACTUAL"
-            action="REVISION MANUAL"
-            motive+="; mismo código y descripción repetidos o con varias tarifas en anexo"
-        if re.search(r"\b(PAQUETE|INCLUYE)\b",normalize(a["desc"])):
-            motive+="; posible paquete: revisar componentes, cobertura y catalogo de paquetes"
-        if proposal.get("tipo_servicio") in {"MEDICAMENTO","INSUMO"}:
-            motive+="; validacion tecnica obligatoria: registro, concentracion/presentacion o referencia segun corresponda"
-        result.append(record(a,b,decision=decision,motivo=motive,action=action,proposed=proposal,score_val=s))
+    result=[]
+    for i,a in enumerate(annex):
+        old=legacy.get(a["code"],[])
+        master=next((x for x in old if x.get("descripcion_prestador","")==a["desc"]),old[0] if old else {})
+        if i in uncertain:
+            result.append(record(a,decision="MULTIPLES CANDIDATOS HAM",
+               motivo="Dos o mas candidatos con puntuacion equivalente; no decidir por orden de filas",
+               action="REVISION MANUAL",proposed=master))
+            continue
+        if i not in chosen:
+            result.append(record(a,decision="EN ANEXO SIN VINCULO CONFIRMADO",
+               motivo="Sin emparejamiento seguro; validar maestro, codigo propio, descripcion y tarifa antes de crear",
+               action="EVALUAR CREACION",proposed=master))
+            continue
+        j,tier,s,conflict,master=chosen[i]
+        b=ham[j]
+        code_ok=key(a["code"])==key(b["code"])
+        tariff_ok=same_tariff(a,b)
+        same_desc=clinical_text(a["desc"])==clinical_text(b["desc"])
+        if conflict:
+            decision="CONFLICTO TECNICO"
+            motive=f"{conflict}; cotejar concentracion, unidad, presentacion o tecnica"
+            action="REVISION TECNICA"
+        elif code_ok and tariff_ok and same_desc:
+            decision="COINCIDENCIA EXACTA"
+            motive="Mismo codigo, descripcion normalizada y tarifa"
+            action="MANTENER"
+        elif tariff_ok and code_ok:
+            decision="COINCIDENCIA DESCRIPTIVA PROBABLE"
+            motive=f"Mismo codigo y tarifa; descripcion equivalente parcialmente ({s}%). Confirmar tecnica"
+            action="VALIDAR DESCRIPCION"
+        elif tariff_ok:
+            decision="EQUIVALENCIA PROPUESTA POR DESCRIPCION Y TARIFA"
+            motive=f"Codigos distintos o propios; tarifa igual y similitud tecnica {s}%; corroborar identidad"
+            action="VALIDAR CODIGO Y DESCRIPCION"
+        else:
+            decision="DIFERENCIA TARIFARIA O DESCRIPTIVA"
+            motive=f"Codigo relacionado, tarifa diferente; similitud {s}%; verificar valor pactado"
+            action="REVISAR TARIFA"
+        if len(code_desc[key(a["code"])])>1:
+            decision="MISMO CODIGO CON VARIANTES"
+            motive+="; varias descripciones del mismo codigo en anexo: validar base y subcodigo existente"
+            action="REVISAR SUBCODIGO"
+        if duplicates[(key(a["code"]),clinical_text(a["desc"]),a["money"])]>1:
+            decision="DUPLICADO CONTRACTUAL"
+            motive+="; misma tecnologia duplicada en anexo"
+            action="REVISAR DUPLICADO"
+        if len(code_prices[key(a["code"])])>1:
+            motive+="; codigo con varias tarifas: verificar convenio y unidad de cobro"
+        if re.search(r"\b(PAQUETE|INCLUYE)\b",clinical_text(a["desc"])):
+            motive+="; verificar alcance de paquete y componentes, no inferirlo solo por palabra incluye"
+        if master.get("tipo_servicio") in ("MEDICAMENTO","INSUMO"):
+            motive+="; validar principio activo/concentracion/presentacion o referencia y registro sanitario"
+            if decision in ("COINCIDENCIA EXACTA","COINCIDENCIA DESCRIPTIVA PROBABLE"):
+                decision="VALIDACION TECNICA MEDICAMENTO O INSUMO"
+                action="REVISION TECNICA"
+        result.append(record(a,b,decision=decision,motivo=motive,action=action,proposed=master,score_val=s))
     for j,b in enumerate(ham):
         if j not in assigned:
             result.append(record(b=b,decision="EN HAM SIN VINCULO CONFIRMADO EN ANEXO",
-              motivo="Posible parametrización extra; verificar anexos, otrosíes, vigencias, sedes y contratos antes de inactivar",
+              motivo="Posible registro no contratado o candidato ambiguo; verificar otrosies, anexos, sedes y periodo contractual",
               action="EVALUAR INACTIVACION"))
     return result
 
