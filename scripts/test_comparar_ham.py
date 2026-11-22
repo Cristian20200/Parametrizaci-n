@@ -78,6 +78,29 @@ class ContratoHamTests(unittest.TestCase):
         r=compare(a,h,{})
         self.assertEqual(sum(bool(x["fila_ham"]) for x in r if x["origen"]=="ANEXO"),1)
 
+
+    def test_equivalencia_concentraciones(self):
+        a=row(2,"10207","ONDANSETRON 8 MG/4ML AMPOLLA",29500)
+        b=row(3,"20095751-4","ONDANSETRON 2MG/ML SLN INY AMP X 4ML",29500)
+        self.assertEqual(__import__("comparar_ham").concentration(a["desc"]),
+                         __import__("comparar_ham").concentration(b["desc"]))
+        self.assertEqual(clinical_conflict(a,b),"")
+        result=compare([a],[b],{})
+        self.assertEqual(result[0]["fila_ham"],3)
+
+    def test_concentracion_distinta_bloquea_homologacion(self):
+        a=row(2,"A","ONDANSETRON 8MG/4ML AMPOLLA",29500)
+        b=row(3,"B","ONDANSETRON 4MG/4ML AMPOLLA",29500)
+        self.assertEqual(clinical_conflict(a,b),"CONCENTRACION DIFERENTE")
+        r=compare([a],[b],{})
+        self.assertFalse(r[0]["decision"]=="COINCIDENCIA EXACTA")
+
+    def test_dosificacion_multiplicativa_no_es_division(self):
+        a=row(2,"A","FARMACO 10MG/1ML",1200)
+        b=row(3,"B","FARMACO 10MG X 1ML",1200)
+        self.assertNotEqual(__import__("comparar_ham").concentration(a["desc"]),
+                            __import__("comparar_ham").concentration(b["desc"]))
+
     def test_decimal_colombiano(self):
         self.assertEqual(amount("25.400"),Decimal("25400"))
         self.assertEqual(amount("25.400,50"),Decimal("25400.50"))
