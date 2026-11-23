@@ -1,3 +1,12 @@
-PENDIENTE: no se encontró HAM.xlsx en la raíz del repositorio.
-Se requiere exportación real de HAM con columnas codigo, descripcion, tarifa.
-No se ha realizado cruce contractual ni se recomiendan inactivaciones.
+AUDITORÍA CONTRACTUAL ANEXO VS HAM
+Filas anexo: 1043
+Filas HAM: 56
+El resultado NO autoriza altas, cambios ni inactivaciones automáticas.
+Una similitud >=80% genera candidato, NO equivalencia clínica.
+CUM, concentración, presentación, técnica y vigencia deben verificarse por fuente oficial.
+
+ESTADOS:
+COINCIDENCIA EXACTA: 2
+DIFERENCIA TARIFARIA O DESCRIPTIVA: 2
+EN ANEXO SIN VINCULO CONFIRMADO: 1039
+EN HAM SIN VINCULO CONFIRMADO EN ANEXO: 52
