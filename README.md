@@ -59,10 +59,12 @@ Pruebas de regresión añadidas: `METOTREXATE` / `METOTREXATO`, trimebutina 10 m
 
 Se ha detectado que los maestros locales pueden contener códigos históricos o sin vigencia oficial comprobada. **Ningún código de maestro se debe copiar a HAM por el mero hecho de parecerse a un concepto del anexo.** En tanto no haya una fuente oficial del periodo contractual incorporada y validada por tipo de tecnología:
 
-- `codigo_homologado` y, por propagación, `codigo_maestro_propuesto` se dejan **vacíos**; no son campos de carga automática.
+- `codigo_homologado` continúa **vacío** sin acreditación oficial; `codigo_maestro_propuesto` **muestra el código exploratorio** del maestro para que el analista pueda investigar, acompañado de `estado_vigencia_codigo` y `fuente_vigencia_codigo`. **No se autoriza utilizarlo para cargar HAM**.
 - `codigo_candidato_no_validado` conserva el identificador exploratorio únicamente para investigación; `estado_vigencia_codigo` muestra `VIGENCIA OFICIAL NO VERIFICADA` y `fuente_vigencia_codigo` explica la ausencia de soporte. Esta regla es preventiva, **no indica que todos los códigos sean inválidos**.
 - Los registros con `estado` interno marcado expresamente como inactivo/no vigente/derogado/vencido se excluyen de los candidatos; una etiqueta local `ACTIVO` o `VIGENTE` **no constituye certificación oficial**.
 - Para CUPS exigir el catálogo/resolución oficial aplicable; para medicamentos verificar las fuentes sanitarias oficiales de CUM/INVIMA y la presentación precisa; para insumos, paquetes y subcódigos corroborar la vigencia de la parametrización local y el contrato. Un histórico `traza.xlsx` no constituye certificación normativa.
 - Los códigos que figuran en `codigo_ham` representan lo ya exportado de HAM, **no una recomendación nueva** ni comprobación de vigencia.
 
 Hasta que se incorpore una fuente de referencia verificada, Parametrica puede **sugerir descripciones para revisión**, pero no ofrecer códigos como candidatos de aplicación directa.
+
+**Nota de presentación:** el cruce contractual `resultados/cruce_anexo_ham.csv` incluye el código candidato visible, descripción, similitud, estado de vigencia y fuente. La presencia del código no implica vigencia ni aprobación clínica. El maestro `resultado_homologacion.csv` mantiene la distinción entre `codigo_homologado` (vacío sin validación) y `codigo_candidato_no_validado` (exploratorio).
