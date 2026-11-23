@@ -277,6 +277,9 @@ def compare(annex,ham,legacy):
     """Cruce bidireccional uno a uno; sin deducir bajas definitivas."""
     by_code=defaultdict(list)
     by_tariff=defaultdict(list)
+    by_annex_tariff=defaultdict(list)
+    for i,a in enumerate(annex):
+        if a["money"] is not None:by_annex_tariff[a["money"]].append((i,a))
     for j,b in enumerate(ham):
         by_code[key(b["code"])].append(j)
         if b["money"] is not None:by_tariff[b["money"]].append(j)
@@ -419,8 +422,7 @@ def compare(annex,ham,legacy):
         # No asumir equivalencia: preservar el par como evidencia pendiente.
         options=[]
         if b["money"] is not None:
-            for i,a in enumerate(annex):
-                if not same_tariff(a,b):continue
+            for i,a in by_annex_tariff[b["money"]]:
                 sa,sb=ingredient_signature(a["desc"]),ingredient_signature(b["desc"])
                 ca,cb=concentration(a["desc"]),concentration(b["desc"])
                 main_a,main_b=primary_term(a["desc"]),primary_term(b["desc"])
