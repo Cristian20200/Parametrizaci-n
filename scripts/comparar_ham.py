@@ -107,7 +107,7 @@ def primary_term(s):
 def package_volume(s):
     text=clinical_text(s)
     # Presentación declarada "X 4ML", independiente de la concentración.
-    m=re.search(r"\bX\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",text)
+    m=re.search(r"\b(?:X|FRASCO|AMPOLLA|VIAL|TUBO)\s*(?:X\s*)?(\d+(?:[.,]\d+)?)\s*(ML|L)\b",text)
     if not m:return None
     q=Decimal(m.group(1).replace(",","."));return q*1000 if m.group(2)=="L" else q
 def dosage_form(s):
@@ -132,7 +132,7 @@ def ingredient_signature(s):
         return ()
     stop={"DE","DEL","LA","EL","N","CLORHIDRATO","DIHIDRATO","TABLETA","CAPSULA",
           "INYECTABLE","AMPOLLA","SOLUCION","FRASCO","CREMA","GEL","JALEA","JARABE"}
-    words=[x for x in t.split() if x not in stop]
+    words=[x for x in re.findall(r"\b[A-Z]+\b",t) if x not in stop]
     # Lista de combinaciones de principios activos de uso frecuente en los anexos.
     groups=("LOSARTAN","HIDROCLOROTIAZIDA","AMOXICILINA","CLAVULANICO",
             "ACIDO","VALPROICO","IBUPROFENO","LISINATO","ACETAMINOFEN",
