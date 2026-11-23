@@ -36,3 +36,13 @@ python scripts/test_comparar_ham.py
 ```
 
 La automatización de GitHub Actions debe ejecutarse ante cambios en `Prestador.xlsx`, `HAM.xlsx`, maestros, scripts o workflow.
+
+## Controles incorporados para ejercicios posteriores (noviembre de 2026)
+
+- El cruce `scripts/comparar_ham.py` utiliza código completo (incluido el sufijo), tarifa, texto clínico normalizado, concentración y forma farmacéutica para **proponer** candidatos. No aprueba equivalencias por tarifa igual.
+- Se bloquean los emparejamientos basados únicamente en tarifa cuando se detectan principios activos/formulaciones diferentes (p. ej. losartán frente a losartán + hidroclorotiazida) o formas farmacéuticas distintas (p. ej. jalea frente a crema).
+- Expresiones `8 MG/4 ML` y `2 MG/ML` permiten comparar concentraciones (2 mg/mL), pero se revisan por separado la dosis total, la vía, la presentación y el registro sanitario. La expresión `X 4 ML` indica presentación; por sí sola no prueba concentración.
+- Las columnas `descripcion_maestro_propuesto` y `similitud_anexo_maestro` se mantienen en el CSV. La similitud es orientativa, **no una tasa de acierto clínico**.
+- Para homologaciones con medicamentos, los controles actuales **no constituyen un validador completo** de todos los ingredientes, sales, concentración, forma, vía y CUM: cuando falte evidencia debe revisarse manualmente.
+- La estadística refleja candidatos detectados; **sin un conjunto de verdad validado por profesionales no puede medirse precisión real**.
+- Las pruebas de regresión incluyen diferencias de dosis, incompatibilidades farmacéuticas y subcódigos, y deben pasar antes de publicar resultados.
