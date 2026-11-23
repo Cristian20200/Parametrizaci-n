@@ -57,6 +57,11 @@ ALIASES = [
     (r"\bTUB\b|\bTUBO\b", " TUBO "),
     (r"\bRX\b|\bRADIOGRAFIA\b", " RADIOGRAFIA "),
     (r"\bTRANSFUSION\b|\bTRANSFUSIONES\b", " TRANSFUSION "),
+    (r"\bMETOTREXATE\b", " METOTREXATO "),
+    (r"\bMETIL\s*ERGOMETRINA\b", " METILERGOMETRINA "),
+    (r"\bINH\b|\bINHALACION\b", " INHALACION "),
+    (r"\bPPR\b", " POLVO PREPARAR "),
+    (r"\bFRA\b", " FRASCO "),
     (r"\bINYECCIONES?\b", " INYECTABLE "),
     (r"\bMG\b", " MG "),
     (r"\bML\b", " ML "),
@@ -131,7 +136,9 @@ def ingredient_signature(s):
     # Lista de combinaciones de principios activos de uso frecuente en los anexos.
     groups=("LOSARTAN","HIDROCLOROTIAZIDA","AMOXICILINA","CLAVULANICO",
             "ACIDO","VALPROICO","IBUPROFENO","LISINATO","ACETAMINOFEN",
-            "ONDANSETRON","ACETILCISTEINA","ADENOSINA")
+            "ONDANSETRON","ACETILCISTEINA","ADENOSINA","HIDROCORTISONA",
+            "METOTREXATO","TRIMEBUTINA","FENOTEROL","IPRATROPIO","INSULINA",
+            "FOLICO","CIPROFLOXACINO","LOVASTATINA","MEROPENEM","LIDOCAINA")
     names=tuple(sorted({w for w in words if w in groups}))
     return names
 
@@ -406,9 +413,36 @@ def compare(annex,ham,legacy):
                 action="REVISION TECNICA"
         result.append(record(a,b,decision=decision,motivo=motive,action=action,proposed=master,score_val=s))
     for j,b in enumerate(ham):
-        if j not in assigned:
+        if j in assigned:continue
+        # Segundo sentido del cruce: una fila HAM no vinculada no debe
+        # recomendar inactivación si existe un candidato del anexo por revisar.
+        # No asumir equivalencia: preservar el par como evidencia pendiente.
+        options=[]
+        if b["money"] is not None:
+            for i,a in enumerate(annex):
+                if not same_tariff(a,b):continue
+                sa,sb=ingredient_signature(a["desc"]),ingredient_signature(b["desc"])
+                ca,cb=concentration(a["desc"]),concentration(b["desc"])
+                main_a,main_b=primary_term(a["desc"]),primary_term(b["desc"])
+                text_score=clinical_score(a,b)
+                if clinical_conflict(a,b):continue
+                if sa and sb and sa!=sb:continue
+                # Exigir un término identificador igual o equivalencia muy alta.
+                if not ((main_a==main_b and len(main_a)>=5) or text_score>=88):continue
+                if text_score<50 and not (ca and cb and ca==cb):continue
+                options.append((text_score,i))
+        options.sort(reverse=True)
+        if options:
+            best_score,i=options[0];a=annex[i]
+            r=record(a,b,decision="HAM CANDIDATO ANEXO POR VERIFICAR",
+                     motivo=f"Cruce inverso por tarifa y descripción ({best_score}%); revisar componentes y presentacion; no se autoriza inactivacion",
+                     action="REVISION MANUAL",score_val=best_score)
+            r["origen"]="HAM"
+            # No recontar la fila del anexo: esto es una sugerencia independiente.
+            result.append(r)
+        else:
             result.append(record(b=b,decision="EN HAM SIN VINCULO CONFIRMADO EN ANEXO",
-              motivo="Posible registro no contratado o candidato ambiguo; verificar otrosies, anexos, sedes y periodo contractual",
+              motivo="No se encontró candidato técnico suficiente; revisar otrosíes, anexos, sedes y periodo contractual antes de inactivar",
               action="EVALUAR INACTIVACION"))
     return result
 
