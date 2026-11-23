@@ -101,6 +101,19 @@ class ContratoHamTests(unittest.TestCase):
         self.assertNotEqual(__import__("comparar_ham").concentration(a["desc"]),
                             __import__("comparar_ham").concentration(b["desc"]))
 
+
+    def test_adenosina_presentacion_abreviada(self):
+        a=row(2,"60940","ADENOSINA 6 MG/2ML AMPOLLA",66226)
+        b=row(3,"20139028-2","ADENOSINA 6 MG SLN INY AMP X 2 ML",66226)
+        r=compare([a],[b],{})
+        self.assertEqual(r[0]["fila_ham"],3)
+        self.assertEqual(r[0]["decision"],"EQUIVALENCIA PROPUESTA POR DESCRIPCION Y TARIFA")
+
+    def test_presentation_volume_difference(self):
+        a=row(2,"A","ONDANSETRON 2MG/ML AMP X 4ML",1000)
+        b=row(3,"B","ONDANSETRON 2MG/ML AMP X 2ML",1000)
+        self.assertEqual(clinical_conflict(a,b),"PRESENTACION VOLUMEN DIFERENTE")
+
     def test_decimal_colombiano(self):
         self.assertEqual(amount("25.400"),Decimal("25400"))
         self.assertEqual(amount("25.400,50"),Decimal("25400.50"))
