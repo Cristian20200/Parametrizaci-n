@@ -1,5 +1,5 @@
 AUDITORÍA DE HOMOLOGACIÓN DE PRESTADOR
-Filas procesadas: 1043
+Filas procesadas: 167
 
 MAESTROS:
 ORDEN DE BUSQUEDA: CUPS > SUBCODIGO > PAQUETE > MEDICAMENTO > INSUMO
@@ -13,13 +13,12 @@ TRAZABILIDAD:
 TRAZA: hojas=4, hoja_seleccionada=2, puntuacion_encabezado=39, filas_datos=10189, encabezado_fila=2, encabezados=['Código con puntos_1', 'CÓDIGO_0', 'DESCRIPCIÓN Res. 2077 / 2021 Res.1638/2022', 'COBERTURA', 'TRAZABILIDAD', 'Código con puntos_2', 'CÓDIGO 1', 'CÓDIGO 2', 'DESCRIPCIÓN RESOLUCIÓN 2775 DE 2022', 'COBERTURA', 'CAPITULO', 'NIVEL', 'TRAZABILIDAD', 'CÓDIGO 1', 'ANEXOS TECNICOS 2336 DE 2023', 'COBERTURA', 'CAPITULO', 'NIVEL', 'TRAZABILIDAD', 'CÓDIGO_1_2024', 'DESCRIPCION_RESOLUCION_2641_DE_2024', 'j', 'COBERTURA', 'CAPITULO', 'NIVEL', '1Agrupador_ Ámbito', '2Agrupador Un_Funcional', '3Agrupador_Servicios ', '4Agrupador_Anatómico', 'CODIGO SOAT']
 TRAZA: columnas de códigos detectadas=[(0, 'Código con puntos_1'), (1, 'CÓDIGO_0'), (5, 'Código con puntos_2'), (6, 'CÓDIGO 1'), (7, 'CÓDIGO 2'), (13, 'CÓDIGO 1'), (19, 'CÓDIGO_1_2024'), (29, 'CODIGO SOAT'), (32, 'CODIGO_ISS_2000')]
 TRAZA: coincidencias de códigos son antecedentes, NO equivalencia clínica ni vigencia oficial
-Filas de prestador con código en traza: 1020
-Filas de prestador cuyo candidato aparece en traza: 419
+Filas de prestador con código en traza: 161
+Filas de prestador cuyo candidato aparece en traza: 161
 
 ESTADOS:
-COINCIDENCIA PROPUESTA: 482
-REVISIÓN TÉCNICA: 4
-SIN COINCIDENCIA >=80%: 557
+COINCIDENCIA PROPUESTA: 161
+SIN COINCIDENCIA >=80%: 6
 
 IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.
 Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.
