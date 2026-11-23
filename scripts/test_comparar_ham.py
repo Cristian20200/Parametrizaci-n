@@ -16,6 +16,21 @@ class ContratoHamTests(unittest.TestCase):
         self.assertEqual(result[0]["decision"],"COINCIDENCIA EXACTA")
         self.assertEqual(result[0]["accion_ham"],"MANTENER")
 
+    def test_codigo_candidato_visible_pero_no_validado(self):
+        from comparar_ham import record
+        a=row(2,"COD-1","ECOCARDIOGRAMA TRANSTORACICO",268086)
+        old={"tipo_servicio":"CUPS","codigo_homologado":"",
+             "codigo_candidato_no_validado":"881202",
+             "descripcion_homologada":"ECOCARDIOGRAMA TRANSTORACICO",
+             "estado_homologacion":"CANDIDATO NO VALIDADO - VIGENCIA PENDIENTE",
+             "estado_vigencia_codigo":"VIGENCIA OFICIAL NO VERIFICADA",
+             "fuente_vigencia_codigo":"SIN FUENTE OFICIAL VIGENTE APORTADA"}
+        r=record(a,proposed=old,decision="EN ANEXO SIN VINCULO CONFIRMADO")
+        self.assertEqual(r["codigo_maestro_propuesto"],"881202")
+        self.assertEqual(r["estado_vigencia_codigo"],"VIGENCIA OFICIAL NO VERIFICADA")
+        self.assertEqual(r["fuente_vigencia_codigo"],"SIN FUENTE OFICIAL VIGENTE APORTADA")
+        self.assertNotEqual(r["estado_homologacion_maestro"],"VIGENTE VERIFICADO")
+
     def test_codigo_propio_misma_descripcion_tarifa(self):
         r=compare([row(2,"OD-009","TOPICACION DE FLUOR EN SOLUCION",25400)],
                   [row(3,"997104","TOPICACION DE FLUOR EN SOLUCION",25400)],{})
