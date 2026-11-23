@@ -105,7 +105,42 @@ def package_volume(s):
     m=re.search(r"\bX\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",text)
     if not m:return None
     q=Decimal(m.group(1).replace(",","."));return q*1000 if m.group(2)=="L" else q
+def dosage_form(s):
+    t=clinical_text(s)
+    if re.search(r"\b(CREMA|UNG(?:UENTO)?|JALEA|GEL|POMADA)\b",t):
+        if re.search(r"\bJALEA\b",t):return "JALEA"
+        if re.search(r"\bCREMA\b",t):return "CREMA"
+        if re.search(r"\bUNG(?:UENTO)?\b",t):return "UNGUENTO"
+        if re.search(r"\bGEL\b",t):return "GEL"
+        return "POMADA"
+    if re.search(r"\b(INYECTABLE|INTRAVENOS[AO]|INTRAMUSCULAR)\b",t):return "INYECTABLE"
+    if re.search(r"\b(JARABE|SUSPENSION)\b",t):return "LIQUIDO_ORAL"
+    if re.search(r"\b(TABLETA|CAPSULA)\b",t):return "SOLIDO_ORAL"
+    return ""
+
+def ingredient_signature(s):
+    """Detector conservador: solo bloquea cuando hay evidencia farmacéutica.
+    No se infiere equivalencia por precio o una palabra común.
+    """
+    t=clinical_text(s)
+    if not re.search(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|UI)(?:/|\b)",t):
+        return ()
+    stop={"DE","DEL","LA","EL","N","CLORHIDRATO","DIHIDRATO","TABLETA","CAPSULA",
+          "INYECTABLE","AMPOLLA","SOLUCION","FRASCO","CREMA","GEL","JALEA","JARABE"}
+    words=[x for x in t.split() if x not in stop]
+    # Lista de combinaciones de principios activos de uso frecuente en los anexos.
+    groups=("LOSARTAN","HIDROCLOROTIAZIDA","AMOXICILINA","CLAVULANICO",
+            "ACIDO","VALPROICO","IBUPROFENO","LISINATO","ACETAMINOFEN",
+            "ONDANSETRON","ACETILCISTEINA","ADENOSINA")
+    names=tuple(sorted({w for w in words if w in groups}))
+    return names
+
 def clinical_conflict(a,b):
+    fa,fb=dosage_form(a["desc"]),dosage_form(b["desc"])
+    if fa and fb and fa!=fb:return "FORMA FARMACEUTICA DIFERENTE"
+    ia,ib=ingredient_signature(a["desc"]),ingredient_signature(b["desc"])
+    if ia and ib and ia!=ib:
+        return "PRINCIPIOS ACTIVOS O FORMULACION DIFERENTES"
     ca,cb=concentration(a["desc"]),concentration(b["desc"])
     pa,pb=package_volume(a["desc"]),package_volume(b["desc"])
     if pa is not None and pb is not None and pa!=pb:
@@ -277,6 +312,10 @@ def compare(annex,ham,legacy):
             if not exact_code and not master_code and s<65 and not medicinal_candidate:
                 continue
             conflict=clinical_conflict(a,b)
+            # Una coincidencia solo por tarifa nunca debe emparejar dos
+            # tecnologias clinicamente incompatibles.
+            if conflict and not (exact_code or master_code):
+                continue
             # Las diferencias de concentración no desaparecen por tarifa/código iguales.
             if exact_code and same_desc and tariff_ok and not conflict:
                 tier=7
