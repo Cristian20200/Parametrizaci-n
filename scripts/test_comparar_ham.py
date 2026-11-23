@@ -154,6 +154,19 @@ class ContratoHamTests(unittest.TestCase):
         b=row(3,"202","BROMURO IPRATROPIO/FENOTEROL SOL NEBULIZAR FRA 20ML",64300)
         self.assertEqual(clinical_conflict(a,b),"PRESENTACION VOLUMEN DIFERENTE")
 
+    def test_vigencia_maestro_no_avalada_por_estado_local(self):
+        from homologar import master_validity
+        self.assertEqual(master_validity({"ESTADO":"ACTIVO"}),
+                         "VIGENCIA OFICIAL NO VERIFICADA")
+        self.assertEqual(master_validity({"ESTADO":"VIGENTE"}),
+                         "VIGENCIA OFICIAL NO VERIFICADA")
+        self.assertEqual(master_validity({"ESTADO":"NO VIGENTE"}),
+                         "NO VIGENTE SEGUN MAESTRO")
+        self.assertEqual(master_validity({"ESTADO":"INACTIVO"}),
+                         "NO VIGENTE SEGUN MAESTRO")
+        self.assertEqual(master_validity({}),
+                         "VIGENCIA OFICIAL NO VERIFICADA")
+
     def test_decimal_colombiano(self):
         self.assertEqual(amount("25.400"),Decimal("25400"))
         self.assertEqual(amount("25.400,50"),Decimal("25400.50"))
