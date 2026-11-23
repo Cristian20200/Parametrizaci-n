@@ -17,9 +17,12 @@ Filas de prestador con código en traza: 161
 Filas de prestador cuyo candidato aparece en traza: 161
 
 ESTADOS:
-COINCIDENCIA PROPUESTA: 161
+CANDIDATO NO VALIDADO - VIGENCIA PENDIENTE: 161
 SIN COINCIDENCIA >=80%: 6
 
 IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.
 Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.
+BLOQUEO DE SEGURIDAD: codigo_homologado vacio mientras no exista acreditacion de vigencia oficial para el periodo contractual.
+Los codigos exploratorios estan SOLO en codigo_candidato_no_validado; no deben cargarse a HAM.
+Las etiquetas ACTIVO/VIGENTE de maestros locales no acreditan por si solas la vigencia normativa o sanitaria.
 Fuente: maestros contenidos en el mismo repositorio y rama utilizada.
