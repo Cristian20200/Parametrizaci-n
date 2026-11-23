@@ -296,7 +296,7 @@ def main():
         record.extend([cnt_o,cnt_c,'ANTECEDENTE / NO VALIDADO' if cnt_o or cnt_c else 'SIN ANTECEDENTE POR CODIGO'])
     traza_info.extend([f'Filas de prestador con código en traza: {traza_original}',f'Filas de prestador cuyo candidato aparece en traza: {traza_candidato}'])
     output=ROOT/'resultados'/'resultado_homologacion.csv'
-    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen','apariciones_codigo_prestador_traza','apariciones_codigo_homologado_traza','estado_traza','codigo_candidato_no_validado','estado_vigencia_codigo','fuente_vigencia_codigo']
+    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen','codigo_candidato_no_validado','estado_vigencia_codigo','fuente_vigencia_codigo','apariciones_codigo_prestador_traza','apariciones_codigo_homologado_traza','estado_traza']
     with open(output,'w',encoding='utf-8-sig',newline='') as f:
         writer=csv.writer(f,delimiter=';');writer.writerow(columns);writer.writerows(rows_out)
     report=['AUDITORÍA DE HOMOLOGACIÓN DE PRESTADOR',f'Filas procesadas: {len(rows_out)}','',
