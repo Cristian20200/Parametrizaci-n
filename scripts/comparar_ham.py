@@ -18,7 +18,8 @@ FIELDS = ["origen","fila_anexo","codigo_anexo","descripcion_anexo","tarifa_anexo
           "fila_ham","codigo_ham","descripcion_ham","tarifa_ham",
           "similitud_descripcion","diferencia_tarifa","categoria_propuesta",
           "codigo_maestro_propuesto","descripcion_maestro_propuesto","similitud_anexo_maestro","estado_homologacion_maestro",
-          "decision","motivo","accion_ham","requiere_validacion"]
+          "decision","motivo","accion_ham","requiere_validacion",
+          "estado_vigencia_codigo","fuente_vigencia_codigo"]
 
 def key(s):
     s = unicodedata.normalize("NFKD", str(s or ""))
@@ -227,6 +228,11 @@ def score(a,b):
 
 def record(a=None,b=None,decision="",motivo="",action="",proposed=None,score_val=None):
     old=proposed or {}
+    # El maestro puede aportar un código exploratorio aunque no se haya
+    # validado su vigencia. Mostrarlo SIEMPRE con estado y fuente explícitos.
+    proposed_code=old.get("codigo_homologado","") or old.get("codigo_candidato_no_validado","")
+    validity=old.get("estado_vigencia_codigo","") or ("VIGENCIA OFICIAL NO VERIFICADA" if proposed_code else "SIN CANDIDATO")
+    evidence=old.get("fuente_vigencia_codigo","") or ("SIN FUENTE OFICIAL VIGENTE APORTADA" if proposed_code else "")
     similarity_score=score_val if score_val is not None else score(a,b) if a and b else ""
     money_diff=(str(a["money"]-b["money"]) if a and b and a["money"] is not None and b["money"] is not None else "")
     return {
@@ -242,11 +248,12 @@ def record(a=None,b=None,decision="",motivo="",action="",proposed=None,score_val
        "similitud_descripcion":similarity_score,
        "diferencia_tarifa":money_diff,
        "categoria_propuesta":old.get("tipo_servicio",""),
-       "codigo_maestro_propuesto":old.get("codigo_homologado",""),
+       "codigo_maestro_propuesto":proposed_code,
        "descripcion_maestro_propuesto":old.get("descripcion_homologada",""),
        "similitud_anexo_maestro":round(similarity(clinical_text(a["desc"]),clinical_text(old.get("descripcion_homologada",""))),1) if a and old.get("descripcion_homologada") else "",
        "estado_homologacion_maestro":old.get("estado_homologacion",""),
        "decision":decision,"motivo":motivo,"accion_ham":action,
+       "estado_vigencia_codigo":validity,"fuente_vigencia_codigo":evidence,
        "requiere_validacion":"SI - VIGENCIA Y ATRIBUTOS TECNICOS" if decision=="COINCIDENCIA EXACTA" else "SI",
     }
 
@@ -300,7 +307,7 @@ def compare(annex,ham,legacy):
         if a["money"] is not None:
             candidate_ids.update(by_tariff[a["money"]])
         # Reintentar con el codigo del maestro propuesto, sin perder el sufijo.
-        mk=key(master.get("codigo_homologado",""))
+        mk=key(master.get("codigo_homologado","") or master.get("codigo_candidato_no_validado",""))
         if mk:
             candidate_ids.update(by_code.get(mk,[]))
         for j in candidate_ids:
