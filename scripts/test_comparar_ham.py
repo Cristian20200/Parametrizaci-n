@@ -114,6 +114,19 @@ class ContratoHamTests(unittest.TestCase):
         b=row(3,"B","ONDANSETRON 2MG/ML AMP X 2ML",1000)
         self.assertEqual(clinical_conflict(a,b),"PRESENTACION VOLUMEN DIFERENTE")
 
+    def test_losartan_monoterapia_vs_combinado(self):
+        a=row(2,"RX1","LOSARTAN 100 MG TABLETA",4500)
+        b=row(3,"RX2","LOSARTAN + HIDROCLOROTIAZIDA 100 + 25 MG TABLETA",4500)
+        self.assertEqual(clinical_conflict(a,b),"PRINCIPIOS ACTIVOS O FORMULACION DIFERENTES")
+        r=compare([a],[b],{})
+        self.assertEqual(r[0]["accion_ham"],"EVALUAR CREACION")
+        self.assertEqual(r[-1]["accion_ham"],"EVALUAR INACTIVACION")
+
+    def test_crema_vs_jalea(self):
+        a=row(2,"P1","LIDOCAINA 4% JALEA",10000)
+        b=row(3,"P2","LIDOCAINA 4% CREMA",10000)
+        self.assertEqual(clinical_conflict(a,b),"FORMA FARMACEUTICA DIFERENTE")
+
     def test_decimal_colombiano(self):
         self.assertEqual(amount("25.400"),Decimal("25400"))
         self.assertEqual(amount("25.400,50"),Decimal("25400.50"))
