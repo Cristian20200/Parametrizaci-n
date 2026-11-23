@@ -95,8 +95,21 @@ def numeric_specs(s):
     s=clinical_text(s)
     # Toda cifra con unidad se mantiene como atributo técnico.
     return set(re.findall(r"\b\d+(?:[.,]\d+)?(?:MG|MCG|G|ML|L|UI)\b",s))
+def primary_term(s):
+    terms=clinical_text(s).split()
+    ignored={"N","DE","DEL","LA","EL","SOLUCION","INYECTABLE","AMPOLLA","TABLETA","CAPSULA","FRASCO"}
+    return next((t for t in terms if t not in ignored and re.search(r"[A-Z]",t)), "")
+def package_volume(s):
+    text=clinical_text(s)
+    # Presentación declarada "X 4ML", independiente de la concentración.
+    m=re.search(r"\bX\s*(\d+(?:[.,]\d+)?)\s*(ML|L)\b",text)
+    if not m:return None
+    q=Decimal(m.group(1).replace(",","."));return q*1000 if m.group(2)=="L" else q
 def clinical_conflict(a,b):
     ca,cb=concentration(a["desc"]),concentration(b["desc"])
+    pa,pb=package_volume(a["desc"]),package_volume(b["desc"])
+    if pa is not None and pb is not None and pa!=pb:
+        return "PRESENTACION VOLUMEN DIFERENTE"
     if ca and cb:
         if ca!=cb:return "CONCENTRACION DIFERENTE"
         # Una misma concentración no garantiza la misma presentación, pero
@@ -254,7 +267,14 @@ def compare(annex,ham,legacy):
             same_desc=clinical_text(a["desc"])==clinical_text(b["desc"])
             if not exact_code and not master_code and not tariff_ok:
                 continue
-            if not exact_code and not master_code and s<65:
+            # Para abreviaturas muy distintas, aceptar solo como candidato de revisión
+            # mismo principio inicial, misma tarifa y todos los atributos numéricos iguales.
+            specs_a=numeric_specs(a["desc"])
+            specs_b=numeric_specs(b["desc"])
+            medicinal_candidate=(tariff_ok and primary_term(a["desc"])==primary_term(b["desc"])
+                                 and len(primary_term(a["desc"]))>=5
+                                 and specs_a and specs_b and specs_a==specs_b)
+            if not exact_code and not master_code and s<65 and not medicinal_candidate:
                 continue
             conflict=clinical_conflict(a,b)
             # Las diferencias de concentración no desaparecen por tarifa/código iguales.
@@ -266,7 +286,7 @@ def compare(annex,ham,legacy):
                 tier=5
             elif tariff_ok and s>=88 and not conflict:
                 tier=4
-            elif tariff_ok and s>=70 and not conflict:
+            elif tariff_ok and (s>=70 or medicinal_candidate) and not conflict:
                 tier=3
             elif exact_code and s>=60:
                 tier=2
