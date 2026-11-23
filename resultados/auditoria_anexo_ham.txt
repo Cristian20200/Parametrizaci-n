@@ -1,14 +1,10 @@
 AUDITORÍA CONTRACTUAL ANEXO VS HAM
-Filas anexo: 1044
-Filas HAM: 897
+Filas anexo: 1409
+Filas HAM: 621
 El resultado NO autoriza altas, cambios ni inactivaciones automáticas.
 Una similitud >=80% genera candidato, NO equivalencia clínica.
 CUM, concentración, presentación, técnica y vigencia deben verificarse por fuente oficial.
 
 ESTADOS:
-CONFLICTO TECNICO: 3
-EN ANEXO SIN VINCULO CONFIRMADO: 516
-EN HAM SIN VINCULO CONFIRMADO EN ANEXO: 343
-EQUIVALENCIA PROPUESTA POR DESCRIPCION Y TARIFA: 517
-HAM CANDIDATO ANEXO POR VERIFICAR: 34
-MULTIPLES CANDIDATOS HAM: 8
+EN ANEXO SIN VINCULO CONFIRMADO: 1409
+EN HAM SIN VINCULO CONFIRMADO EN ANEXO: 621
