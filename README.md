@@ -46,3 +46,11 @@ La automatización de GitHub Actions debe ejecutarse ante cambios en `Prestador.
 - Para homologaciones con medicamentos, los controles actuales **no constituyen un validador completo** de todos los ingredientes, sales, concentración, forma, vía y CUM: cuando falte evidencia debe revisarse manualmente.
 - La estadística refleja candidatos detectados; **sin un conjunto de verdad validado por profesionales no puede medirse precisión real**.
 - Las pruebas de regresión incluyen diferencias de dosis, incompatibilidades farmacéuticas y subcódigos, y deben pasar antes de publicar resultados.
+
+## Cruce inverso HAM → Anexo (revisión del archivo manual)
+
+Desde la revisión del libro `cruce_anexo_ham(1).xlsx`, el motor también compara las filas de HAM no vinculadas contra el anexo por tarifa y descripción, verificando incompatibilidades detectables. El nuevo estado `HAM CANDIDATO ANEXO POR VERIFICAR` señala un **posible** vínculo contractual, sin darlo por equivalente ni autorizar inactivación. Los candidatos aparecen en `resultados/cruce_anexo_ham.csv` con ambas descripciones, tarifas, puntuación y justificación.
+
+Las fórmulas de búsqueda/similitud del archivo manual no son datos certificados: por ejemplo, misma tarifa puede relacionar insulina con ácido fólico o presentaciones diferentes. Las decisiones se validan por atributos y documentos aplicables; no trasladar automáticamente los resultados de una fórmula a los maestros.
+
+Pruebas de regresión añadidas: `METOTREXATE` / `METOTREXATO`, trimebutina 10 mg/mL frente a 50 mg/5 mL, presentación distinta de fenoterol/ipratropio, y rechazo de relación insulina/ácido fólico solo por tarifa.
