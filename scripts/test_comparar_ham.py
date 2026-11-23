@@ -127,6 +127,33 @@ class ContratoHamTests(unittest.TestCase):
         b=row(3,"P2","LIDOCAINA 4% CREMA",10000)
         self.assertEqual(clinical_conflict(a,b),"FORMA FARMACEUTICA DIFERENTE")
 
+
+    def test_reverse_ham_hidrocortisona_solo_candidato(self):
+        a=row(2,"101","HIDROCORTISONA 100 MG AMPOLLA",17866)
+        b=row(3,"19926707-1","HIDROCORTISONA 100 MG PPR SLN INY X VIAL",17866)
+        r=compare([a],[b],{})
+        self.assertTrue(any(x["codigo_ham"]=="19926707-1" for x in r))
+        self.assertFalse(any(x["decision"]=="COINCIDENCIA EXACTA" for x in r))
+
+    def test_reverse_ham_no_emparejar_insulina_con_folico(self):
+        a=row(2,"701","ACIDO FOLICO 5MG TABLETA",528)
+        b=row(3,"27190-3","INSULINA HUMANA ISOFANA NPH 100UI/ML SLN INY VIAL X 10ML",528)
+        r=compare([a],[b],{})
+        self.assertFalse(any(x["decision"]=="HAM CANDIDATO ANEXO POR VERIFICAR" for x in r))
+
+    def test_alias_metotrexato_metotrexate(self):
+        self.assertEqual(clinical_text("METOTREXATE 500 MG/5ML"),
+                         clinical_text("METOTREXATO 500MG/5ML"))
+
+    def test_trimebutina_concentracion_equivalente(self):
+        from comparar_ham import concentration
+        self.assertEqual(concentration("TRIMEBUTINA 10MG/ML"),concentration("TRIMEBUTINA 50MG/5ML"))
+
+    def test_fenoterol_ipratropio_volumen_distinto(self):
+        a=row(2,"101","FENOTEROL IPRATROPIO SLN INH FCO X 10ML",64300)
+        b=row(3,"202","BROMURO IPRATROPIO/FENOTEROL SOL NEBULIZAR FRA 20ML",64300)
+        self.assertEqual(clinical_conflict(a,b),"PRESENTACION VOLUMEN DIFERENTE")
+
     def test_decimal_colombiano(self):
         self.assertEqual(amount("25.400"),Decimal("25400"))
         self.assertEqual(amount("25.400,50"),Decimal("25400.50"))
