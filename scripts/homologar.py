@@ -98,6 +98,15 @@ def get_table(filename):
 def val(row,i):
     return str(row[i] if i is not None and i<len(row) else '').strip()
 
+def master_validity(extra):
+    """El estado interno del maestro no acredita vigencia normativa actual."""
+    raw=" ".join(str(v or "") for k,v in extra.items()
+                 if "ESTADO" in k or "VIGENCIA" in k)
+    status=plain(raw)
+    if re.search(r"\b(NO VIGENTE|INACTIVO|INACTIVA|DEROGADO|DEROGADA|ANULADO|ANULADA|VENCIDO|VENCIDA|CANCELADO|CANCELADA|SUSPENDIDO|SUSPENDIDA|RETIRADO|RETIRADA|OBSOLETO|OBSOLETA)\b",status):
+        return "NO VIGENTE SEGUN MAESTRO"
+    return "VIGENCIA OFICIAL NO VERIFICADA"
+
 def main():
     os.makedirs(ROOT/'resultados',exist_ok=True)
     records=[]; index=collections.defaultdict(set); file_counts={}
@@ -136,6 +145,10 @@ def main():
                 nh=normalize(h)
                 if any(k in nh for k in ['EXPEDIENTE','REGISTRO SANITARIO','REGISTRO_SANITARIO','VIGENCIA','ESTADO','TITULAR']):
                     rec['extra'][nh]=val(row,i)
+            rec['validity']=master_validity(rec['extra'])
+            if rec['validity']=='NO VIGENTE SEGUN MAESTRO':
+                file_counts[fname+'_no_vigentes_excluidos']=file_counts.get(fname+'_no_vigentes_excluidos',0)+1
+                continue
             pos=len(records);records.append(rec)
             for tok in set(rec['tokens']):
                 index[tok].add(pos)
@@ -216,11 +229,23 @@ def main():
         if best and best['type']=='MEDICAMENTO':obs.append('Verificar expediente/registro según titular y producto')
         if best and best['type']=='SUBCODIGO':obs.append('Confirmar código base y metodología')
         if not best:obs.append('Sin maestro con similitud suficiente; revisar manualmente')
-        more=' | '.join(f"{records[j]['type']}:{records[j]['code']} ({round(s,1)}%)" for s,j in top[1:3])
+        more=' | '.join(f"NO VALIDADO {records[j]['type']}:{records[j]['code']} ({round(s,1)}%)" for s,j in top[1:3])
         ex=best['extra'] if best else {}
         exp=next((v for k,v in ex.items() if 'EXPEDIENTE' in k),'')
         reg=next((v for k,v in ex.items() if 'REGISTRO' in k),'')
-        rows_out.append([codigo,desc,precio,best['type'] if best else '',best['code'] if best else '',best['description'] if best else '',score if best else '',exp,reg,status,'; '.join(obs),more,best['file'] if best else ''])
+        # BLOQUEO: sin padrón oficial vigente validado para el período del contrato,
+        # no publicar un código como maestro propuesto utilizable. El candidato
+        # queda solo como evidencia explícitamente NO VALIDADA.
+        candidate_code=best['code'] if best else ''
+        if best:
+            obs.append('BLOQUEADO: vigencia oficial no comprobada; no utilizar código candidato en parametrización')
+            status='CANDIDATO NO VALIDADO - VIGENCIA PENDIENTE'
+        rows_out.append([codigo,desc,precio,best['type'] if best else '',
+                         '',best['description'] if best else '',score if best else '',
+                         exp,reg,status,'; '.join(obs),more,best['file'] if best else '',
+                         candidate_code,
+                         'VIGENCIA OFICIAL NO VERIFICADA' if best else 'SIN CANDIDATO',
+                         'SIN FUENTE OFICIAL VIGENTE APORTADA'])
         totals[status]+=1
         if n%500==0:print('Procesados',n,flush=True)
     # La traza es evidencia histórica; no se usa como nomenclador ni para certificar vigencia.
@@ -263,7 +288,7 @@ def main():
     traza_candidato=0
     for record in rows_out:
         original=record[0].upper().replace(' ','')
-        candidato=record[4].upper().replace(' ','')
+        candidato=record[13].upper().replace(' ','')
         cnt_o=traza_lookup.get(original,0)
         cnt_c=traza_lookup.get(candidato,0) if candidato else 0
         traza_original+=bool(cnt_o)
@@ -271,13 +296,16 @@ def main():
         record.extend([cnt_o,cnt_c,'ANTECEDENTE / NO VALIDADO' if cnt_o or cnt_c else 'SIN ANTECEDENTE POR CODIGO'])
     traza_info.extend([f'Filas de prestador con código en traza: {traza_original}',f'Filas de prestador cuyo candidato aparece en traza: {traza_candidato}'])
     output=ROOT/'resultados'/'resultado_homologacion.csv'
-    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen','apariciones_codigo_prestador_traza','apariciones_codigo_homologado_traza','estado_traza']
+    columns=['codigo_prestador','descripcion_prestador','valor_pactado','tipo_servicio','codigo_homologado','descripcion_homologada','porcentaje_coincidencia','expediente_invima','registro_sanitario','estado_homologacion','observacion','otras_coincidencias','maestro_origen','apariciones_codigo_prestador_traza','apariciones_codigo_homologado_traza','estado_traza','codigo_candidato_no_validado','estado_vigencia_codigo','fuente_vigencia_codigo']
     with open(output,'w',encoding='utf-8-sig',newline='') as f:
         writer=csv.writer(f,delimiter=';');writer.writerow(columns);writer.writerows(rows_out)
     report=['AUDITORÍA DE HOMOLOGACIÓN DE PRESTADOR',f'Filas procesadas: {len(rows_out)}','',
             'MAESTROS:',*header_report,'','TRAZABILIDAD:',*traza_info,'','ESTADOS:',*(f'{k}: {v}' for k,v in sorted(totals.items())),'',
             'IMPORTANTE: Un parecido >=80% no equivale a homologación clínica ni valida expedientes INVIMA.',
             'Códigos y valores originales preservados. Revisar concentración, técnica y vigencia oficial.',
+            'BLOQUEO DE SEGURIDAD: codigo_homologado vacio mientras no exista acreditacion de vigencia oficial para el periodo contractual.',
+            'Los codigos exploratorios estan SOLO en codigo_candidato_no_validado; no deben cargarse a HAM.',
+            'Las etiquetas ACTIVO/VIGENTE de maestros locales no acreditan por si solas la vigencia normativa o sanitaria.',
             'Fuente: maestros contenidos en el mismo repositorio y rama utilizada.']
     (ROOT/'resultados'/'auditoria_homologacion.txt').write_text('\n'.join(report),encoding='utf-8')
     print('\n'.join(report))
